@@ -1,0 +1,34 @@
+{
+  "name": "liveq",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LiveQ — real-time interactive conference and training platform",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,magenta \"npm run dev -w @liveq/api\" \"npm run dev -w @liveq/web\"",
+    "dev:api": "npm run dev -w @liveq/api",
+    "dev:web": "npm run dev -w @liveq/web",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e -w @liveq/api",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run prisma:migrate -w @liveq/api",
+    "db:deploy": "npm run prisma:deploy -w @liveq/api",
+    "db:generate": "npm run prisma:generate -w @liveq/api"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.6.2",
+    "prettier-plugin-tailwindcss": "^0.6.14",
+    "typescript": "6.0.3"
+  }
+}

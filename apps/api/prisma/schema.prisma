@@ -1,0 +1,177 @@
+// LiveQ persistence model.
+//
+// Integrity that Prisma can express lives here. Two rules are easy to get wrong later:
+//
+// 1. correct_answers is a separate row, not a nullable column on questions.
+//    A correct-option foreign key on questions cycles with question_options and
+//    makes session deletion fail. Absence of a row means an ungraded opinion poll.
+//
+// 2. question_runs.open_session_id is the database lock for "one open question".
+//    It is set to session_id while status is OPEN and cleared when the run closes.
+//    PostgreSQL unique indexes allow many nulls, so closed runs do not collide.
+//    Phase 4 must update status and open_session_id in the same transaction.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SessionStatus {
+  DRAFT
+  ACTIVE
+  ENDED
+
+  @@map("session_status")
+}
+
+enum QuestionRunStatus {
+  OPEN
+  CLOSED
+
+  @@map("question_run_status")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique @db.VarChar(254)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  displayName  String   @map("display_name") @db.VarChar(80)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  sessions Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id          String        @id @default(uuid()) @db.Uuid
+  ownerId     String        @map("owner_id") @db.Uuid
+  title       String        @db.VarChar(160)
+  description String?
+  joinCode         String        @unique @map("join_code") @db.VarChar(8)
+  status           SessionStatus @default(DRAFT)
+  scheduledStartAt DateTime?     @map("scheduled_start_at") @db.Timestamptz(3)
+  scheduledEndAt   DateTime?     @map("scheduled_end_at") @db.Timestamptz(3)
+  startedAt        DateTime?     @map("started_at") @db.Timestamptz(3)
+  endedAt          DateTime?     @map("ended_at") @db.Timestamptz(3)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  questions    Question[]
+  participants Participant[]
+  questionRuns QuestionRun[]
+
+  @@index([ownerId, status])
+  @@map("sessions")
+}
+
+model Question {
+  id        String   @id @default(uuid()) @db.Uuid
+  sessionId String   @map("session_id") @db.Uuid
+  prompt    String
+  position  Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  session       Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  options       QuestionOption[]
+  correctAnswer CorrectAnswer?
+  runs          QuestionRun[]
+
+  @@unique([id, sessionId])
+  @@unique([sessionId, position])
+  @@map("questions")
+}
+
+model QuestionOption {
+  id         String   @id @default(uuid()) @db.Uuid
+  questionId String   @map("question_id") @db.Uuid
+  label      String   @db.VarChar(500)
+  position   Int
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  question      Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  correctAnswer CorrectAnswer?
+  votes         Vote[]
+
+  @@unique([id, questionId])
+  @@unique([questionId, position])
+  @@map("question_options")
+}
+
+/// At most one row per question. No row means the question is an opinion poll.
+model CorrectAnswer {
+  questionId String @id @map("question_id") @db.Uuid
+  optionId   String @map("option_id") @db.Uuid
+
+  question Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  option   QuestionOption @relation(fields: [optionId, questionId], references: [id, questionId], onDelete: Cascade)
+
+  @@unique([optionId, questionId])
+  @@map("correct_answers")
+}
+
+model Participant {
+  id         String   @id @default(uuid()) @db.Uuid
+  sessionId  String   @map("session_id") @db.Uuid
+  tokenHash  String   @unique @map("token_hash") @db.Char(64)
+  nickname   String?  @db.VarChar(40)
+  joinedAt   DateTime @default(now()) @map("joined_at") @db.Timestamptz(3)
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  votes   Vote[]
+
+  @@unique([id, sessionId])
+  @@index([sessionId])
+  @@map("participants")
+}
+
+model QuestionRun {
+  id                 String            @id @default(uuid()) @db.Uuid
+  questionId         String            @map("question_id") @db.Uuid
+  sessionId          String            @map("session_id") @db.Uuid
+  status             QuestionRunStatus @default(OPEN)
+  /// Equals sessionId while voting is open. Null after the run is closed.
+  openSessionId      String?           @unique @map("open_session_id") @db.Uuid
+  timerSeconds       Int?              @map("timer_seconds")
+  openedAt           DateTime          @default(now()) @map("opened_at") @db.Timestamptz(3)
+  closesAt           DateTime?         @map("closes_at") @db.Timestamptz(3)
+  closedAt           DateTime?         @map("closed_at") @db.Timestamptz(3)
+  resultsPublishedAt DateTime?         @map("results_published_at") @db.Timestamptz(3)
+
+  question Question @relation(fields: [questionId, sessionId], references: [id, sessionId], onDelete: Cascade)
+  session  Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  votes    Vote[]
+
+  @@unique([id, questionId, sessionId])
+  @@index([sessionId, status])
+  @@index([questionId, openedAt])
+  @@map("question_runs")
+}
+
+model Vote {
+  id            String   @id @default(uuid()) @db.Uuid
+  questionRunId String   @map("question_run_id") @db.Uuid
+  questionId    String   @map("question_id") @db.Uuid
+  sessionId     String   @map("session_id") @db.Uuid
+  participantId String   @map("participant_id") @db.Uuid
+  optionId      String   @map("option_id") @db.Uuid
+  submittedAt   DateTime @default(now()) @map("submitted_at") @db.Timestamptz(3)
+
+  questionRun QuestionRun    @relation(fields: [questionRunId, questionId, sessionId], references: [id, questionId, sessionId], onDelete: Cascade)
+  option      QuestionOption @relation(fields: [optionId, questionId], references: [id, questionId], onDelete: Cascade)
+  participant Participant    @relation(fields: [participantId, sessionId], references: [id, sessionId], onDelete: Cascade)
+
+  @@unique([questionRunId, participantId])
+  @@index([questionRunId, optionId])
+  @@map("votes")
+}

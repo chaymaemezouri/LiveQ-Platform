@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: liveq
+          POSTGRES_PASSWORD: liveq
+          POSTGRES_DB: liveq
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U liveq -d liveq"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://liveq:liveq@localhost:5432/liveq?schema=public
+      JWT_SECRET: ci-only-jwt-secret-must-be-32-characters
+      WEB_ORIGIN: http://localhost:5173
+      API_PORT: 3002
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:deploy
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:e2e
+      - run: npm run build
