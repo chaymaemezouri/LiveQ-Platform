@@ -36,6 +36,32 @@ export function publicRequest<T>(path: string, init?: RequestInit): Promise<T> {
   return send(path, init, false);
 }
 
+export async function requestBlob(
+  path: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const headers = new Headers();
+  const token = readToken();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
+  const response = await fetch(`${baseUrl}${path}`, { headers });
+  if (!response.ok) {
+    const body = await readBody(response);
+    if (response.status === 401) {
+      clearToken();
+      onUnauthorized?.();
+    }
+    throw new ApiError(readErrorMessage(body), response.status);
+  }
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const match = /filename="([^"]+)"/.exec(disposition);
+  return {
+    blob: await response.blob(),
+    filename: match?.[1] ?? 'liveq-report',
+  };
+}
+
 async function send<T>(
   path: string,
   init: RequestInit | undefined,

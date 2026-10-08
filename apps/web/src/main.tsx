@@ -13,6 +13,8 @@ import { NotFoundPage } from '@/routes/not-found-page';
 import { OverviewPage } from '@/routes/overview-page';
 import { QuestionEditorPage } from '@/routes/question-editor-page';
 import { RegisterPage } from '@/routes/register-page';
+import { ReportPage } from '@/routes/report-page';
+import { ReportsPage } from '@/routes/reports-page';
 import { SessionDetailPage } from '@/routes/session-detail-page';
 import { SessionFormPage } from '@/routes/session-form-page';
 import { SessionsPage } from '@/routes/sessions-page';
@@ -45,6 +47,8 @@ const router = createBrowserRouter([
         children: [
           { index: true, Component: OverviewPage },
           { path: 'sessions', Component: SessionsPage },
+          { path: 'reports', Component: ReportsPage },
+          { path: 'reports/:sessionId', Component: ReportPage },
           { path: 'sessions/new', Component: SessionFormPage },
           { path: 'sessions/:id', Component: SessionDetailPage },
           { path: 'sessions/:id/edit', Component: SessionFormPage },

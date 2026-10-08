@@ -145,6 +145,9 @@ export function SessionDetailPage() {
               </dl>
 
               <div className="mt-8 flex flex-wrap gap-3">
+                <Button variant="outline" asChild>
+                  <Link to={`/app/reports/${session.data.id}`}>Statistics</Link>
+                </Button>
                 {session.data.status !== 'ENDED' ? (
                   <Button variant="outline" asChild>
                     <Link to={`/app/sessions/${session.data.id}/edit`}>Edit</Link>

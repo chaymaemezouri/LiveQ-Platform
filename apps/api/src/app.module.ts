@@ -7,6 +7,7 @@ import { LiveModule } from './live/live.module';
 import { ParticipantsModule } from './participants/participants.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { QuestionsModule } from './questions/questions.module';
+import { ReportsModule } from './reports/report.module';
 import { SessionsModule } from './sessions/sessions.module';
 
 @Module({
@@ -23,6 +24,7 @@ import { SessionsModule } from './sessions/sessions.module';
     QuestionsModule,
     ParticipantsModule,
     LiveModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}

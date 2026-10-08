@@ -1,4 +1,4 @@
-import { CircleUser, LayoutDashboard, Presentation } from 'lucide-react';
+import { ChartColumn, CircleUser, LayoutDashboard, Presentation } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
 import { useAuth } from '@/hooks/use-auth';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 const links = [
   { to: '/app', label: 'Overview', icon: LayoutDashboard, end: true },
   { to: '/app/sessions', label: 'Sessions', icon: Presentation, end: false },
+  { to: '/app/reports', label: 'Reports', icon: ChartColumn, end: false },
   { to: '/app/account', label: 'Account', icon: CircleUser, end: false },
 ];
 

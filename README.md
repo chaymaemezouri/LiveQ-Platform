@@ -2,7 +2,7 @@
 
 Real-time audience interaction for scientific conferences, lectures, workshops, and training sessions.
 
-This repository is at **Phase 4**: speakers can open a question for live voting, participants answer once over Socket.IO, and published results appear as charts. Session-wide analytics and projector mode are not implemented yet.
+This repository is at **Phase 5**: speakers can open a question for live voting, participants answer once over Socket.IO, and each conference has a statistics dashboard with PDF and Excel export. Projector mode is not implemented yet.
 
 ## Repository layout
 
@@ -46,19 +46,19 @@ Copy-Item .env.example .env
 
 ## Scripts
 
-| Command                             | Purpose                                                  |
-| ----------------------------------- | -------------------------------------------------------- |
-| `npm run dev`                       | API and web app together                                 |
-| `npm run dev:api`                   | API only                                                 |
-| `npm run dev:web`                   | Web app only                                             |
-| `npm run lint`                      | Lint both workspaces                                     |
-| `npm run format`                    | Format the repository with Prettier                      |
-| `npm test`                          | Unit tests                                               |
-| `npm run test:e2e`                  | API health, sessions, questions, and participant joining |
-| `npm run build`                     | Production build                                         |
-| `npm run db:up` / `npm run db:down` | Start or stop PostgreSQL                                 |
-| `npm run db:migrate`                | Create a new Prisma migration in development             |
-| `npm run db:deploy`                 | Apply committed migrations                               |
+| Command                             | Purpose                                                       |
+| ----------------------------------- | ------------------------------------------------------------- |
+| `npm run dev`                       | API and web app together                                      |
+| `npm run dev:api`                   | API only                                                      |
+| `npm run dev:web`                   | Web app only                                                  |
+| `npm run lint`                      | Lint both workspaces                                          |
+| `npm run format`                    | Format the repository with Prettier                           |
+| `npm test`                          | Unit tests                                                    |
+| `npm run test:e2e`                  | API health, sessions, questions, joining, voting, and reports |
+| `npm run build`                     | Production build                                              |
+| `npm run db:up` / `npm run db:down` | Start or stop PostgreSQL                                      |
+| `npm run db:migrate`                | Create a new Prisma migration in development                  |
+| `npm run db:deploy`                 | Apply committed migrations                                    |
 
 `prisma generate` runs before the API dev server, tests, and build. The generated client is not committed.
 
@@ -103,6 +103,10 @@ Speaker routes:
 | GET, POST          | `/api/sessions/:sessionId/live`                  | Bearer token. Live snapshot, plus `launch`, `close`, `publish`, and `next`. |
 | GET                | `/api/join/live`                                 | Participant reconnect token. Current question without unpublished answers.  |
 | POST               | `/api/join/votes`                                | Participant reconnect token. One vote on the open question.                 |
+| GET                | `/api/reports`                                   | Bearer token. One summary per conference owned by the speaker.              |
+| GET                | `/api/reports/:sessionId`                        | Bearer token. Participation, voting, and published question charts.         |
+| GET                | `/api/reports/:sessionId/export.pdf`             | Bearer token. The same report as a PDF download.                            |
+| GET                | `/api/reports/:sessionId/export.xlsx`            | Bearer token. The same report as an Excel workbook.                         |
 
 Passwords are stored as Argon2 hashes and are never returned. The speaker access token payload contains only the speaker id. Session and question writes ignore any client-supplied owner id. Each session gets an 8-character joining code. `joinUrl` is `${WEB_ORIGIN}/join/{code}`.
 
@@ -112,11 +116,13 @@ A question has two to six options. `correctOptionIndex` selects one of those opt
 
 A speaker opens one question at a time. Participants receive it over Socket.IO and can vote once. The speaker sees the submitted-vote count immediately. Closing voting stops new votes. Publishing results sends the chart, the percentages, and—only then—the correct option. Opinion polls publish with no correct option. The next question opens only after the current results are published. Ending a session closes any open vote. Refreshing or reconnecting restores the same live state.
 
-The web app provides registration, sign-in, a speaker dashboard with the participant count, session create/edit/detail with a QR code and live voting controls, a question list and editor on each session, account sign-out, `/status`, and a mobile waiting room at `/join` and `/join/:code`.
+Each conference has a speaker-only report. Participation is the share of people who submitted at least one vote. Voting is the share of possible votes that were cast on questions the speaker opened. The correct-answer rate uses published graded questions only. Charts and the correct option appear after results are published; an unpublished question keeps its vote count and hides the answer split. Ended conferences stay in Reports. The same numbers download as PDF and Excel.
+
+The web app provides registration, sign-in, a speaker dashboard with the participant count, session create/edit/detail with a QR code and live voting controls, a question list and editor on each session, a reports dashboard, account sign-out, `/status`, and a mobile waiting room at `/join` and `/join/:code`.
 
 ## Database
 
-PostgreSQL 17. The Prisma schema is `apps/api/prisma/schema.prisma`. Phase 1 renames the session lifecycle value `LIVE` to `ACTIVE` and adds optional `scheduled_start_at` and `scheduled_end_at` columns. `started_at` and `ended_at` are still written when a session is activated or ended. Phases 2, 3, and 4 use the existing question, participant, question-run, and vote tables and do not add a migration.
+PostgreSQL 17. The Prisma schema is `apps/api/prisma/schema.prisma`. Phase 1 renames the session lifecycle value `LIVE` to `ACTIVE` and adds optional `scheduled_start_at` and `scheduled_end_at` columns. `started_at` and `ended_at` are still written when a session is activated or ended. Phases 2 through 5 use the existing question, participant, question-run, and vote tables and do not add a migration.
 
 Notable integrity rules already in the schema:
 
@@ -132,7 +138,6 @@ Notable integrity rules already in the schema:
 
 | Later phase | Not in this build           |
 | ----------- | --------------------------- |
-| 5           | Session-wide analytics      |
 | 6           | Projector presentation mode |
 
-Published question results use Recharts. Session-wide reports are still deferred.
+Published question results and conference reports use Recharts. PDF and Excel exports list the same figures without a chart image.
