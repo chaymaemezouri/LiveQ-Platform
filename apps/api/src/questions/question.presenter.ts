@@ -8,6 +8,7 @@ export interface QuestionRecord {
   id: string;
   sessionId: string;
   prompt: string;
+  kind: 'CHOICE' | 'TEXT';
   position: number;
   createdAt: Date;
   updatedAt: Date;
@@ -19,6 +20,7 @@ export interface QuestionView {
   id: string;
   sessionId: string;
   prompt: string;
+  kind: 'CHOICE' | 'TEXT';
   position: number;
   options: QuestionOptionView[];
   correctOptionId: string | null;
@@ -38,6 +40,7 @@ export function presentQuestion(
     id: question.id,
     sessionId: question.sessionId,
     prompt: question.prompt,
+    kind: question.kind,
     position: question.position,
     options: options.map((option) => ({
       id: option.id,

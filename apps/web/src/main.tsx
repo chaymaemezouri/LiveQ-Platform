@@ -11,6 +11,7 @@ import { JoinPage } from '@/routes/join-page';
 import { LoginPage } from '@/routes/login-page';
 import { NotFoundPage } from '@/routes/not-found-page';
 import { OverviewPage } from '@/routes/overview-page';
+import { PresentPage } from '@/routes/present-page';
 import { QuestionEditorPage } from '@/routes/question-editor-page';
 import { RegisterPage } from '@/routes/register-page';
 import { ReportPage } from '@/routes/report-page';
@@ -42,6 +43,7 @@ const router = createBrowserRouter([
     path: '/app',
     Component: ProtectedRoute,
     children: [
+      { path: 'present/:sessionId', Component: PresentPage },
       {
         Component: DashboardShell,
         children: [

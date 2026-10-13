@@ -112,12 +112,18 @@ export function QuestionList({ sessionId }: { sessionId: string }) {
                 <div className="min-w-0">
                   <p className="text-muted-foreground text-xs tracking-wide uppercase">
                     Question {question.position}
-                    {question.correctOptionId ? ' · Graded' : ' · Opinion poll'}
+                    {question.kind === 'TEXT'
+                      ? ' · Written answer'
+                      : question.correctOptionId
+                        ? ' · Graded'
+                        : ' · Opinion poll'}
                     {question.hasVotingHistory ? ' · Has votes' : ''}
                   </p>
                   <h3 className="mt-1 text-lg">{question.prompt}</h3>
                   <p className="text-muted-foreground mt-1 text-sm">
-                    {question.options.length} options
+                    {question.kind === 'TEXT'
+                      ? 'Participants type an answer'
+                      : `${question.options.length} options`}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">

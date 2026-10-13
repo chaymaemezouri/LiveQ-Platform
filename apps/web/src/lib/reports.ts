@@ -12,6 +12,7 @@ export interface ReportQuestion {
   questionId: string;
   position: number;
   prompt: string;
+  kind?: 'CHOICE' | 'TEXT';
   published: boolean;
   graded: boolean;
   voteCount: number;
@@ -20,6 +21,7 @@ export interface ReportQuestion {
   correctPercent: number | null;
   correctOptionId: string | null;
   options: ReportOption[];
+  responses?: string[];
 }
 
 export interface SessionReport {

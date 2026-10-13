@@ -21,6 +21,7 @@ const reportSelect = {
     select: {
       id: true,
       prompt: true,
+      kind: true,
       position: true,
       options: { select: { id: true, label: true, position: true } },
       correctAnswer: { select: { optionId: true } },
@@ -28,7 +29,7 @@ const reportSelect = {
         select: {
           openedAt: true,
           resultsPublishedAt: true,
-          votes: { select: { optionId: true, participantId: true } },
+          votes: { select: { optionId: true, textResponse: true, participantId: true } },
         },
       },
     },
@@ -108,6 +109,7 @@ function toSource(session: ReportRecord): ReportSource {
         return {
           id: question.id,
           prompt: question.prompt,
+          kind: question.kind,
           position: question.position,
           options: [...question.options]
             .sort((left, right) => left.position - right.position)

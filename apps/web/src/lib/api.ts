@@ -120,6 +120,7 @@ export interface Question {
   id: string;
   sessionId: string;
   prompt: string;
+  kind: 'CHOICE' | 'TEXT';
   position: number;
   options: QuestionOption[];
   correctOptionId: string | null;
@@ -130,7 +131,8 @@ export interface Question {
 
 export interface QuestionInput {
   prompt: string;
-  options: { label: string }[];
+  kind: 'CHOICE' | 'TEXT';
+  options?: { label: string }[];
   correctOptionIndex?: number | null;
 }
 

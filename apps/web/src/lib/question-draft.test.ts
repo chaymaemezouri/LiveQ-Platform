@@ -3,6 +3,7 @@ import { validateQuestionDraft } from '@/lib/question-draft';
 
 const valid = {
   prompt: 'What is 2 + 2?',
+  kind: 'CHOICE' as const,
   options: ['3', '4'],
   ungraded: false,
   correctIndex: 1,
@@ -25,5 +26,17 @@ describe('validateQuestionDraft', () => {
     expect(validateQuestionDraft({ ...valid, correctIndex: null })).toMatch(
       /correct option/i,
     );
+  });
+
+  it('accepts a written question with only a prompt', () => {
+    expect(
+      validateQuestionDraft({
+        prompt: 'Name a color',
+        kind: 'TEXT',
+        options: [],
+        ungraded: true,
+        correctIndex: null,
+      }),
+    ).toBeNull();
   });
 });

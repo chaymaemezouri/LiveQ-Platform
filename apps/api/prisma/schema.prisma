@@ -36,6 +36,13 @@ enum QuestionRunStatus {
   @@map("question_run_status")
 }
 
+enum QuestionKind {
+  CHOICE
+  TEXT
+
+  @@map("question_kind")
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique @db.VarChar(254)
@@ -76,6 +83,7 @@ model Question {
   id        String   @id @default(uuid()) @db.Uuid
   sessionId String   @map("session_id") @db.Uuid
   prompt    String
+  kind      QuestionKind @default(CHOICE)
   position  Int
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -164,11 +172,12 @@ model Vote {
   questionId    String   @map("question_id") @db.Uuid
   sessionId     String   @map("session_id") @db.Uuid
   participantId String   @map("participant_id") @db.Uuid
-  optionId      String   @map("option_id") @db.Uuid
+  optionId      String?  @map("option_id") @db.Uuid
+  textResponse  String?  @map("text_response") @db.VarChar(500)
   submittedAt   DateTime @default(now()) @map("submitted_at") @db.Timestamptz(3)
 
   questionRun QuestionRun    @relation(fields: [questionRunId, questionId, sessionId], references: [id, questionId, sessionId], onDelete: Cascade)
-  option      QuestionOption @relation(fields: [optionId, questionId], references: [id, questionId], onDelete: Cascade)
+  option      QuestionOption? @relation(fields: [optionId, questionId], references: [id, questionId], onDelete: Cascade)
   participant Participant    @relation(fields: [participantId, sessionId], references: [id, sessionId], onDelete: Cascade)
 
   @@unique([questionRunId, participantId])

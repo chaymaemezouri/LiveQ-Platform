@@ -56,15 +56,12 @@ export class QuestionsService {
     sessionId: string,
     dto: QuestionContentDto,
   ): Promise<QuestionView> {
-    const correctIndex = this.assertCorrectIndex(
-      dto.correctOptionIndex,
-      dto.options.length,
-    );
+    const content = this.assertContent(dto);
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         return await this.prisma.$transaction((tx) =>
-          this.insert(tx, ownerId, sessionId, dto, correctIndex),
+          this.insert(tx, ownerId, sessionId, dto, content),
         );
       } catch (error) {
         if (this.isPositionConflict(error) && attempt < 2) {
@@ -83,10 +80,7 @@ export class QuestionsService {
     questionId: string,
     dto: QuestionContentDto,
   ): Promise<QuestionView> {
-    const correctIndex = this.assertCorrectIndex(
-      dto.correctOptionIndex,
-      dto.options.length,
-    );
+    const content = this.assertContent(dto);
 
     return this.prisma.$transaction(async (tx) => {
       await this.requireEditable(tx, ownerId, sessionId, questionId);
@@ -94,9 +88,11 @@ export class QuestionsService {
       await tx.questionOption.deleteMany({ where: { questionId } });
       await tx.question.update({
         where: { id: questionId },
-        data: { prompt: dto.prompt },
+        data: { prompt: dto.prompt, kind: content.kind },
       });
-      await this.createOptions(tx, questionId, dto, correctIndex);
+      if (content.kind === 'CHOICE') {
+        await this.createOptions(tx, questionId, dto.options ?? [], content.correctIndex);
+      }
       return this.load(tx, ownerId, sessionId, questionId);
     });
   }
@@ -168,7 +164,7 @@ export class QuestionsService {
     ownerId: string,
     sessionId: string,
     dto: QuestionContentDto,
-    correctIndex: number | null,
+    content: { kind: 'CHOICE' | 'TEXT'; correctIndex: number | null },
   ): Promise<QuestionView> {
     await this.requireSession(tx, ownerId, sessionId);
     const maxPosition = await tx.question.aggregate({
@@ -179,22 +175,25 @@ export class QuestionsService {
       data: {
         sessionId,
         prompt: dto.prompt,
+        kind: content.kind,
         position: (maxPosition._max.position ?? 0) + 1,
       },
       select: { id: true },
     });
-    await this.createOptions(tx, created.id, dto, correctIndex);
+    if (content.kind === 'CHOICE') {
+      await this.createOptions(tx, created.id, dto.options ?? [], content.correctIndex);
+    }
     return this.load(tx, ownerId, sessionId, created.id);
   }
 
   private async createOptions(
     tx: Prisma.TransactionClient,
     questionId: string,
-    dto: QuestionContentDto,
+    options: { label: string }[],
     correctIndex: number | null,
   ): Promise<void> {
     const optionIds: string[] = [];
-    for (const [index, optionInput] of dto.options.entries()) {
+    for (const [index, optionInput] of options.entries()) {
       const option = await tx.questionOption.create({
         data: {
           questionId,
@@ -279,6 +278,22 @@ export class QuestionsService {
       where: { sessionId, questionId: { in: questionIds } },
     });
     return new Set(rows.map((row) => row.questionId));
+  }
+
+  private assertContent(dto: QuestionContentDto): {
+    kind: 'CHOICE' | 'TEXT';
+    correctIndex: number | null;
+  } {
+    if (dto.kind === 'TEXT') {
+      if ((dto.options?.length ?? 0) > 0 || dto.correctOptionIndex != null) {
+        throw new BadRequestException('A written question does not use options.');
+      }
+      return { kind: 'TEXT', correctIndex: null };
+    }
+    return {
+      kind: 'CHOICE',
+      correctIndex: this.assertCorrectIndex(dto.correctOptionIndex, dto.options?.length ?? 0),
+    };
   }
 
   private assertCorrectIndex(

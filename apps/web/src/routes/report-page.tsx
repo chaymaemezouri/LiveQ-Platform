@@ -60,7 +60,7 @@ export function ReportPage() {
 
       {report.data ? (
         <>
-          <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+          <div className="mt-4 flex flex-wrap items-end justify-between gap-4 rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-violet-50 px-5 py-5 dark:border-border dark:from-card dark:via-card dark:to-violet-950/40">
             <div>
               <div className="flex flex-wrap items-center gap-3">
                 <h1 className="text-3xl">{report.data.title}</h1>

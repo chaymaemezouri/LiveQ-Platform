@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -10,6 +11,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
@@ -32,13 +34,19 @@ export class QuestionContentDto {
   @MaxLength(4000)
   prompt!: string;
 
+  @IsOptional()
+  @IsIn(['CHOICE', 'TEXT'])
+  kind?: 'CHOICE' | 'TEXT';
+
+  @ValidateIf((dto: QuestionContentDto) => dto.kind !== 'TEXT')
   @IsArray()
   @ArrayMinSize(2)
   @ArrayMaxSize(6)
   @ValidateNested({ each: true })
   @Type(() => QuestionOptionDto)
-  options!: QuestionOptionDto[];
+  options?: QuestionOptionDto[];
 
+  @ValidateIf((dto: QuestionContentDto) => dto.kind !== 'TEXT')
   @IsOptional()
   @IsInt()
   @Min(0)

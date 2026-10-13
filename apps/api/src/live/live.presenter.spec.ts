@@ -8,6 +8,8 @@ function run(overrides: Partial<LiveRunSource> = {}): LiveRunSource {
   return {
     id: 'run-1',
     status: 'OPEN',
+    timerSeconds: null,
+    closesAt: null,
     resultsPublishedAt: null,
     question: {
       id: 'question-1',
@@ -37,6 +39,20 @@ describe('live presentation', () => {
     expect(state.results).toBeNull();
     expect(state).not.toHaveProperty('correctOptionId');
     expect(state.question?.options.map((option) => option.label)).toEqual(['3', '4']);
+  });
+
+  it('shares the countdown without the correct answer', () => {
+    const closesAt = new Date('2026-11-01T09:00:30.000Z');
+    const state = presentLiveState({
+      sessionStatus: 'ACTIVE',
+      askedQuestionIds: ['question-1'],
+      run: run({ timerSeconds: 30, closesAt }),
+    });
+
+    expect(state.timerSeconds).toBe(30);
+    expect(state.closesAt).toBe('2026-11-01T09:00:30.000Z');
+    expect(state).not.toHaveProperty('correctOptionId');
+    expect(state.results).toBeNull();
   });
 
   it('keeps results hidden after voting closes', () => {
@@ -87,6 +103,49 @@ describe('live presentation', () => {
     });
 
     expect(state.correctOptionId).toBeNull();
+  });
+
+  it('hides written answers until results are published', () => {
+    const hidden = presentLiveState({
+      sessionStatus: 'ACTIVE',
+      askedQuestionIds: ['question-1'],
+      run: run({
+        question: {
+          id: 'question-1',
+          prompt: 'Name a color',
+          position: 1,
+          kind: 'TEXT',
+          options: [],
+          correctAnswer: null,
+        },
+        votes: [{ optionId: null, participantId: 'p1', textResponse: 'blue' }],
+      }),
+    });
+
+    expect(hidden.responses).toBeNull();
+    expect(JSON.stringify(hidden)).not.toContain('blue');
+
+    const shown = presentLiveState({
+      sessionStatus: 'ACTIVE',
+      askedQuestionIds: ['question-1'],
+      run: run({
+        status: 'CLOSED',
+        resultsPublishedAt: new Date('2026-10-08T12:00:00.000Z'),
+        question: {
+          id: 'question-1',
+          prompt: 'Name a color',
+          position: 1,
+          kind: 'TEXT',
+          options: [],
+          correctAnswer: null,
+        },
+        votes: [{ optionId: null, participantId: 'p1', textResponse: 'blue' }],
+      }),
+    });
+
+    expect(shown.responses).toEqual(['blue']);
+    expect(shown.results).toBeNull();
+    expect(shown.correctOptionId).toBeNull();
   });
 
   it('rounds an empty tally to zero percent', () => {

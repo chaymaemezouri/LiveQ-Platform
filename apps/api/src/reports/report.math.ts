@@ -77,12 +77,20 @@ function presentQuestion(
 ): ReportQuestion {
   const votes = question.run?.votes ?? [];
   const published = question.run?.published ?? false;
-  const graded = question.correctOptionId !== null;
+  const kind = question.kind ?? 'CHOICE';
+  const graded = kind === 'CHOICE' && question.correctOptionId !== null;
   const voteCount = votes.length;
+  const responses =
+    kind === 'TEXT' && published
+      ? votes.flatMap((vote) =>
+          vote.textResponse?.trim() ? [vote.textResponse.trim()] : [],
+        )
+      : [];
   const base = {
     questionId: question.id,
     position: question.position,
     prompt: question.prompt,
+    kind,
     published,
     graded,
     voteCount,
@@ -96,6 +104,7 @@ function presentQuestion(
       correctPercent: null,
       correctOptionId: null,
       options: [],
+      responses: [],
     };
   }
 
@@ -110,7 +119,8 @@ function presentQuestion(
       correctCount === null || voteCount === 0
         ? null
         : percent(correctCount, voteCount),
-    correctOptionId: question.correctOptionId,
-    options: resultBars(question.options, votes),
+    correctOptionId: graded ? question.correctOptionId : null,
+    options: kind === 'TEXT' ? [] : resultBars(question.options, votes),
+    responses,
   };
 }

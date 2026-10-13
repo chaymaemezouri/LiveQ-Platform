@@ -7,11 +7,15 @@ import type {
 
 export function resultBars(
   options: { id: string; label: string; position: number }[],
-  votes: { optionId: string }[],
+  votes: { optionId: string | null }[],
 ): LiveResultView[] {
-  const total = votes.length;
+  const counted = votes.filter((vote) => vote.optionId);
+  const total = counted.length;
   const counts = new Map<string, number>();
-  for (const vote of votes) {
+  for (const vote of counted) {
+    if (!vote.optionId) {
+      continue;
+    }
     counts.set(vote.optionId, (counts.get(vote.optionId) ?? 0) + 1);
   }
   return [...options]
@@ -38,17 +42,22 @@ export function presentLiveState(input: {
     askedQuestionIds: input.askedQuestionIds,
     question: null,
     results: null,
+    responses: null,
+    timerSeconds: input.run?.timerSeconds ?? null,
+    closesAt: input.run?.closesAt?.toISOString() ?? null,
   };
 
   if (!input.run) {
     return { ...base, phase: 'idle' };
   }
 
+  const kind = input.run.question.kind ?? 'CHOICE';
   const question = {
     runId: input.run.id,
     questionId: input.run.question.id,
     prompt: input.run.question.prompt,
     position: input.run.question.position,
+    kind,
     options: [...input.run.question.options]
       .sort((left, right) => left.position - right.position)
       .map((option) => ({
@@ -70,7 +79,14 @@ export function presentLiveState(input: {
     ...base,
     phase: 'published',
     question,
-    results: resultBars(question.options, input.run.votes),
-    correctOptionId: input.run.question.correctAnswer?.optionId ?? null,
+    results: kind === 'TEXT' ? null : resultBars(question.options, input.run.votes),
+    responses:
+      kind === 'TEXT'
+        ? input.run.votes.flatMap((vote) =>
+            vote.textResponse?.trim() ? [vote.textResponse.trim()] : [],
+          )
+        : null,
+    correctOptionId:
+      kind === 'TEXT' ? null : (input.run.question.correctAnswer?.optionId ?? null),
   };
 }

@@ -101,15 +101,19 @@ export function SessionDetailPage() {
 
       {session.data ? (
         <>
-          <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
-            <section>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl">{session.data.title}</h1>
+          <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <section className="border-border bg-card min-w-0 rounded-2xl border p-6 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h1 className="font-serif text-4xl tracking-tight">{session.data.title}</h1>
+                  {session.data.description ? (
+                    <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-6">
+                      {session.data.description}
+                    </p>
+                  ) : null}
+                </div>
                 <StatusBadge status={session.data.status} />
               </div>
-              <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-6">
-                {session.data.description || 'No description.'}
-              </p>
               {message ? (
                 <p className="text-foreground mt-4 text-sm" role="status">
                   {message}
@@ -121,14 +125,10 @@ export function SessionDetailPage() {
                 </p>
               ) : null}
 
-              <dl className="mt-8 grid gap-4 sm:grid-cols-2">
+              <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <Detail
-                  label="Scheduled start"
-                  value={formatDateTime(session.data.scheduledStartAt)}
-                />
-                <Detail
-                  label="Scheduled end"
-                  value={formatDateTime(session.data.scheduledEndAt)}
+                  label="Participants"
+                  value={String(session.data.participantCount)}
                 />
                 <Detail
                   label="Activated"
@@ -138,13 +138,30 @@ export function SessionDetailPage() {
                   label="Ended"
                   value={formatDateTime(session.data.endedAt, 'Not yet')}
                 />
-                <Detail
-                  label="Participants"
-                  value={String(session.data.participantCount)}
-                />
+                {session.data.scheduledStartAt || session.data.scheduledEndAt ? (
+                  <>
+                    <Detail
+                      label="Scheduled start"
+                      value={formatDateTime(session.data.scheduledStartAt)}
+                    />
+                    <Detail
+                      label="Scheduled end"
+                      value={formatDateTime(session.data.scheduledEndAt)}
+                    />
+                  </>
+                ) : null}
               </dl>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-6 flex flex-wrap items-center gap-2 border-t pt-5">
+                <Button asChild>
+                  <a
+                    href={`/app/present/${session.data.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Present
+                  </a>
+                </Button>
                 <Button variant="outline" asChild>
                   <Link to={`/app/reports/${session.data.id}`}>Statistics</Link>
                 </Button>
@@ -180,22 +197,28 @@ export function SessionDetailPage() {
                     </Button>
                   </>
                 ) : (
-                  <Button variant="destructive" onClick={() => setConfirmDelete(true)}>
+                  <Button
+                    variant="destructive"
+                    className="sm:ml-auto"
+                    onClick={() => setConfirmDelete(true)}
+                  >
                     Delete
                   </Button>
                 )}
               </div>
             </section>
 
-            <aside className="border-border bg-card rounded-xl border p-4 shadow-sm">
-              <h2 className="text-lg">Joining code</h2>
-              <p className="mt-1 font-mono text-2xl tracking-[0.2em]">
+            <aside className="border-border bg-card min-w-0 rounded-2xl border p-5 shadow-sm">
+              <h2 className="text-muted-foreground text-xs tracking-[0.16em] uppercase">
+                Joining code
+              </h2>
+              <p className="mt-3 font-serif text-2xl tracking-[0.14em] sm:text-3xl">
                 {session.data.joinCode}
               </p>
-              <p className="text-muted-foreground mt-3 text-sm break-all">
+              <p className="text-muted-foreground mt-2 text-xs break-all">
                 {session.data.joinUrl}
               </p>
-              <div className="mt-4 max-w-60">
+              <div className="mt-4 rounded-xl border bg-white p-3 dark:bg-slate-950">
                 <QrCode value={session.data.joinUrl} />
               </div>
               <Button
@@ -217,9 +240,9 @@ export function SessionDetailPage() {
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <dt className="text-muted-foreground text-xs tracking-wide uppercase">{label}</dt>
-      <dd className="mt-1 text-sm">{value}</dd>
+    <div className="bg-muted/50 rounded-xl px-3 py-3">
+      <dt className="text-muted-foreground text-[11px] tracking-wide uppercase">{label}</dt>
+      <dd className="mt-1 text-sm font-medium">{value}</dd>
     </div>
   );
 }

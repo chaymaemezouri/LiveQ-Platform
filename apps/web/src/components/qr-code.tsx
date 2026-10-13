@@ -39,7 +39,7 @@ export function QrCode({ value }: { value: string }) {
 
   return (
     <div
-      className="rounded-lg bg-white p-3 [&_svg]:h-auto [&_svg]:w-full"
+      className="max-w-full rounded-lg bg-white p-3 [&_svg]:h-auto [&_svg]:w-full [&_svg]:max-w-full [&_svg]:min-w-0"
       role="img"
       aria-label="QR code for the participant joining address"
       dangerouslySetInnerHTML={{ __html: svg }}

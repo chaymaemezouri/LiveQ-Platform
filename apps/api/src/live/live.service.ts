@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -26,11 +27,12 @@ const runInclude = {
       correctAnswer: { select: { optionId: true } },
     },
   },
-  votes: { select: { optionId: true, participantId: true } },
+  votes: { select: { optionId: true, textResponse: true, participantId: true } },
 } satisfies Prisma.QuestionRunInclude;
 
 @Injectable()
-export class LiveService {
+export class LiveService implements OnModuleInit {
+  private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
   private broadcast: LiveBroadcast = {
     state: () => undefined,
     votes: () => undefined,
@@ -43,6 +45,20 @@ export class LiveService {
 
   attach(broadcast: LiveBroadcast): void {
     this.broadcast = broadcast;
+  }
+
+  async onModuleInit(): Promise<void> {
+    const open = await this.prisma.questionRun.findMany({
+      where: { status: 'OPEN', closesAt: { not: null } },
+      select: { sessionId: true, closesAt: true },
+    });
+    for (const run of open) {
+      if (!run.closesAt || run.closesAt.getTime() <= Date.now()) {
+        await this.expire(run.sessionId);
+      } else {
+        this.armTimer(run.sessionId, run.closesAt);
+      }
+    }
   }
 
   async authenticate(auth: Record<string, unknown> | undefined): Promise<LiveIdentity> {
@@ -106,13 +122,15 @@ export class LiveService {
   ): Promise<ParticipantLiveState> {
     await this.touch(participantId);
     const state = await this.publicState(sessionId);
-    return { ...state, myOptionId: await this.myOptionId(participantId, state) };
+    const mine = await this.myAnswer(participantId, state);
+    return { ...state, myOptionId: mine.optionId, myText: mine.textResponse };
   }
 
   async launch(
     ownerId: string,
     sessionId: string,
     questionId: string,
+    timerSeconds: number | null = null,
   ): Promise<LivePublicState> {
     await this.requireActive(ownerId, sessionId);
     const latest = await this.latestRun(sessionId);
@@ -139,6 +157,8 @@ export class LiveService {
       throw new ConflictException('This question has already been asked.');
     }
 
+    const closesAt =
+      timerSeconds === null ? null : new Date(Date.now() + timerSeconds * 1000);
     try {
       await this.prisma.questionRun.create({
         data: {
@@ -146,6 +166,8 @@ export class LiveService {
           sessionId,
           status: 'OPEN',
           openSessionId: sessionId,
+          timerSeconds,
+          closesAt,
         },
       });
     } catch (error) {
@@ -155,11 +177,13 @@ export class LiveService {
       throw error;
     }
 
+    this.armTimer(sessionId, closesAt);
     return this.publishState(sessionId);
   }
 
   async close(ownerId: string, sessionId: string): Promise<LivePublicState> {
     await this.requireActive(ownerId, sessionId);
+    this.clearTimer(sessionId);
     const updated = await this.prisma.questionRun.updateMany({
       where: { sessionId, status: 'OPEN' },
       data: { status: 'CLOSED', openSessionId: null, closedAt: new Date() },
@@ -190,7 +214,11 @@ export class LiveService {
     return this.publishState(sessionId);
   }
 
-  async next(ownerId: string, sessionId: string): Promise<LivePublicState> {
+  async next(
+    ownerId: string,
+    sessionId: string,
+    timerSeconds: number | null = null,
+  ): Promise<LivePublicState> {
     await this.requireActive(ownerId, sessionId);
     const run = await this.latestRun(sessionId);
     if (run?.status === 'OPEN') {
@@ -215,14 +243,14 @@ export class LiveService {
     if (!question) {
       throw new NotFoundException('There is no further question.');
     }
-    return this.launch(ownerId, sessionId, question.id);
+    return this.launch(ownerId, sessionId, question.id, timerSeconds);
   }
 
   async cast(
     participantId: string,
     sessionId: string,
     dto: CastVoteDto,
-  ): Promise<{ myOptionId: string; voteCount: number }> {
+  ): Promise<{ myOptionId: string | null; textResponse: string | null; voteCount: number }> {
     const session = await this.prisma.session.findUnique({
       where: { id: sessionId },
       select: { status: true },
@@ -233,9 +261,13 @@ export class LiveService {
 
     const run = await this.prisma.questionRun.findFirst({
       where: { sessionId, status: 'OPEN' },
-      select: { id: true, questionId: true },
+      select: { id: true, questionId: true, closesAt: true },
     });
     if (!run) {
+      throw new ConflictException('Voting is not open.');
+    }
+    if (run.closesAt && run.closesAt.getTime() <= Date.now()) {
+      await this.expire(sessionId);
       throw new ConflictException('Voting is not open.');
     }
 
@@ -247,18 +279,41 @@ export class LiveService {
       throw new ConflictException('You already voted on this question.');
     }
 
-    const option = await this.prisma.questionOption.findFirst({
-      where: { id: dto.optionId, questionId: run.questionId },
-      select: { id: true },
+    const question = await this.prisma.question.findFirst({
+      where: { id: run.questionId },
+      select: { kind: true },
     });
-    if (!option) {
+    if (!question) {
+      throw new ConflictException('Voting is not open.');
+    }
+    const written = question.kind === 'TEXT';
+    const text = dto.textResponse?.trim() ?? '';
+    if (written) {
+      if (!text || dto.optionId) {
+        throw new BadRequestException('Write an answer for this question.');
+      }
+    } else if (!dto.optionId || text) {
       throw new BadRequestException('Choose one of the options for this question.');
+    }
+
+    if (!written) {
+      const option = await this.prisma.questionOption.findFirst({
+        where: { id: dto.optionId, questionId: run.questionId },
+        select: { id: true },
+      });
+      if (!option) {
+        throw new BadRequestException('Choose one of the options for this question.');
+      }
     }
 
     try {
       await this.prisma.$transaction(async (tx) => {
         const open = await tx.questionRun.findFirst({
-          where: { id: run.id, status: 'OPEN' },
+          where: {
+            id: run.id,
+            status: 'OPEN',
+            OR: [{ closesAt: null }, { closesAt: { gt: new Date() } }],
+          },
           select: { id: true },
         });
         if (!open) {
@@ -270,11 +325,16 @@ export class LiveService {
             questionId: run.questionId,
             sessionId,
             participantId,
-            optionId: dto.optionId,
+            optionId: written ? null : dto.optionId,
+            textResponse: written ? text : null,
           },
         });
         const stillOpen = await tx.questionRun.findFirst({
-          where: { id: run.id, status: 'OPEN' },
+          where: {
+            id: run.id,
+            status: 'OPEN',
+            OR: [{ closesAt: null }, { closesAt: { gt: new Date() } }],
+          },
           select: { id: true },
         });
         if (!stillOpen) {
@@ -299,10 +359,15 @@ export class LiveService {
       where: { questionRunId: run.id },
     });
     this.broadcast.votes(sessionId, voteCount);
-    return { myOptionId: dto.optionId, voteCount };
+    return {
+      myOptionId: written ? null : (dto.optionId ?? null),
+      textResponse: written ? text : null,
+      voteCount,
+    };
   }
 
   async onSessionEnded(sessionId: string): Promise<void> {
+    this.clearTimer(sessionId);
     await this.prisma.questionRun.updateMany({
       where: { sessionId, status: 'OPEN' },
       data: { status: 'CLOSED', openSessionId: null, closedAt: new Date() },
@@ -320,9 +385,9 @@ export class LiveService {
   async myBallot(
     participantId: string,
     sessionId: string,
-  ): Promise<{ optionId: string | null }> {
+  ): Promise<{ optionId: string | null; textResponse: string | null }> {
     const state = await this.publicState(sessionId);
-    return { optionId: await this.myOptionId(participantId, state) };
+    return this.myAnswer(participantId, state);
   }
 
   private async publishState(sessionId: string): Promise<LivePublicState> {
@@ -332,6 +397,7 @@ export class LiveService {
   }
 
   private async publicState(sessionId: string): Promise<LivePublicState> {
+    await this.closeIfDue(sessionId);
     const session = await this.prisma.session.findUnique({
       where: { id: sessionId },
       select: { status: true },
@@ -361,18 +427,21 @@ export class LiveService {
     });
   }
 
-  private async myOptionId(
+  private async myAnswer(
     participantId: string,
     state: LivePublicState,
-  ): Promise<string | null> {
+  ): Promise<{ optionId: string | null; textResponse: string | null }> {
     if (!state.question) {
-      return null;
+      return { optionId: null, textResponse: null };
     }
     const vote = await this.prisma.vote.findFirst({
       where: { participantId, questionId: state.question.questionId },
-      select: { optionId: true },
+      select: { optionId: true, textResponse: true },
     });
-    return vote?.optionId ?? null;
+    return {
+      optionId: vote?.optionId ?? null,
+      textResponse: vote?.textResponse ?? null,
+    };
   }
 
   private async requireOwned(ownerId: string, sessionId: string) {
@@ -399,5 +468,44 @@ export class LiveService {
 
   private isKnown(error: unknown, code: string): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
+  }
+
+  private armTimer(sessionId: string, closesAt: Date | null): void {
+    this.clearTimer(sessionId);
+    if (!closesAt) {
+      return;
+    }
+    const delay = Math.max(0, closesAt.getTime() - Date.now());
+    const handle = setTimeout(() => {
+      this.timers.delete(sessionId);
+      void this.expire(sessionId);
+    }, delay);
+    this.timers.set(sessionId, handle);
+  }
+
+  private clearTimer(sessionId: string): void {
+    const handle = this.timers.get(sessionId);
+    if (handle) {
+      clearTimeout(handle);
+    }
+    this.timers.delete(sessionId);
+  }
+
+  private async expire(sessionId: string): Promise<void> {
+    if (await this.closeIfDue(sessionId)) {
+      await this.publishState(sessionId);
+    }
+  }
+
+  private async closeIfDue(sessionId: string): Promise<boolean> {
+    const updated = await this.prisma.questionRun.updateMany({
+      where: { sessionId, status: 'OPEN', closesAt: { lte: new Date() } },
+      data: { status: 'CLOSED', openSessionId: null, closedAt: new Date() },
+    });
+    if (updated.count === 1) {
+      this.clearTimer(sessionId);
+      return true;
+    }
+    return false;
   }
 }

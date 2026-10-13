@@ -15,6 +15,7 @@ import { ParticipantAuthGuard } from '../participants/participant-auth.guard';
 import type { ParticipantIdentity } from '../participants/participant.presenter';
 import { CastVoteDto } from './dto/cast-vote.dto';
 import { LaunchQuestionDto } from './dto/launch-question.dto';
+import { NextQuestionDto } from './dto/next-question.dto';
 import { LiveService } from './live.service';
 
 @Controller('sessions/:sessionId/live')
@@ -36,7 +37,12 @@ export class LiveController {
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @Body() dto: LaunchQuestionDto,
   ) {
-    return this.liveService.launch(user.id, sessionId, dto.questionId);
+    return this.liveService.launch(
+      user.id,
+      sessionId,
+      dto.questionId,
+      dto.timerSeconds ?? null,
+    );
   }
 
   @Post('close')
@@ -59,8 +65,9 @@ export class LiveController {
   next(
     @CurrentUser() user: AuthenticatedUser,
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Body() dto: NextQuestionDto,
   ) {
-    return this.liveService.next(user.id, sessionId);
+    return this.liveService.next(user.id, sessionId, dto.timerSeconds ?? null);
   }
 }
 

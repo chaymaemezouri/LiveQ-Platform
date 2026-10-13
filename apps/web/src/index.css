@@ -27,12 +27,12 @@
 }
 
 :root {
-  --radius: 0.8rem;
-  --background: oklch(0.984 0.004 255);
-  --foreground: oklch(0.24 0.04 258);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.24 0.04 258);
-  --primary: oklch(0.31 0.055 258);
+  --radius: 0.9rem;
+  --background: oklch(0.972 0.01 255);
+  --foreground: oklch(0.21 0.045 262);
+  --card: oklch(0.995 0.004 255);
+  --card-foreground: oklch(0.21 0.045 262);
+  --primary: oklch(0.27 0.06 262);
   --primary-foreground: oklch(0.985 0.004 255);
   --secondary: oklch(0.96 0.008 255);
   --secondary-foreground: oklch(0.31 0.045 258);
@@ -73,7 +73,13 @@
   }
 
   body {
-    @apply bg-background text-foreground m-0 min-h-screen font-sans antialiased;
+    @apply text-foreground bg-background m-0 min-h-screen font-sans antialiased;
+  }
+
+  html:not(.dark) body {
+    background-image:
+      radial-gradient(ellipse at top, oklch(0.94 0.02 270 / 0.55), transparent 55%),
+      linear-gradient(180deg, oklch(0.985 0.006 255), var(--background));
   }
 
   h1,

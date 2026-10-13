@@ -19,6 +19,7 @@ export interface LiveQuestionView {
   questionId: string;
   prompt: string;
   position: number;
+  kind: 'CHOICE' | 'TEXT';
   options: LiveOptionView[];
 }
 
@@ -29,11 +30,15 @@ export interface LivePublicState {
   askedQuestionIds: string[];
   question: LiveQuestionView | null;
   results: LiveResultView[] | null;
+  responses: string[] | null;
+  timerSeconds: number | null;
+  closesAt: string | null;
   correctOptionId?: string | null;
 }
 
 export interface ParticipantLiveState extends LivePublicState {
   myOptionId: string | null;
+  myText: string | null;
 }
 
 export interface LiveIdentity {
@@ -51,13 +56,16 @@ export interface LiveBroadcast {
 export interface LiveRunSource {
   id: string;
   status: 'OPEN' | 'CLOSED';
+  timerSeconds: number | null;
+  closesAt: Date | null;
   resultsPublishedAt: Date | null;
   question: {
     id: string;
     prompt: string;
     position: number;
+    kind?: 'CHOICE' | 'TEXT';
     options: LiveOptionView[];
     correctAnswer: { optionId: string } | null;
   };
-  votes: { optionId: string; participantId: string }[];
+  votes: { optionId: string | null; participantId: string; textResponse?: string | null }[];
 }

@@ -22,6 +22,7 @@ export interface LiveQuestion {
   questionId: string;
   prompt: string;
   position: number;
+  kind?: 'CHOICE' | 'TEXT';
   options: LiveOption[];
 }
 
@@ -32,11 +33,15 @@ export interface LiveState {
   askedQuestionIds: string[];
   question: LiveQuestion | null;
   results: LiveResult[] | null;
+  responses?: string[] | null;
+  timerSeconds: number | null;
+  closesAt: string | null;
   correctOptionId?: string | null;
 }
 
 export interface ParticipantLiveState extends LiveState {
   myOptionId: string | null;
+  myText: string | null;
 }
 
 export function fetchLiveState(sessionId: string): Promise<LiveState> {
@@ -46,10 +51,14 @@ export function fetchLiveState(sessionId: string): Promise<LiveState> {
 export function launchQuestion(
   sessionId: string,
   questionId: string,
+  timerSeconds: number | null,
 ): Promise<LiveState> {
   return request<LiveState>(`/api/sessions/${sessionId}/live/launch`, {
     method: 'POST',
-    body: JSON.stringify({ questionId }),
+    body: JSON.stringify({
+      questionId,
+      ...(timerSeconds ? { timerSeconds } : {}),
+    }),
   });
 }
 
@@ -65,8 +74,14 @@ export function publishResults(sessionId: string): Promise<LiveState> {
   });
 }
 
-export function nextQuestion(sessionId: string): Promise<LiveState> {
-  return request<LiveState>(`/api/sessions/${sessionId}/live/next`, { method: 'POST' });
+export function nextQuestion(
+  sessionId: string,
+  timerSeconds: number | null,
+): Promise<LiveState> {
+  return request<LiveState>(`/api/sessions/${sessionId}/live/next`, {
+    method: 'POST',
+    body: JSON.stringify(timerSeconds ? { timerSeconds } : {}),
+  });
 }
 
 export function fetchParticipantLive(code: string): Promise<ParticipantLiveState> {
@@ -78,11 +93,22 @@ export function fetchParticipantLive(code: string): Promise<ParticipantLiveState
 export function castVote(
   code: string,
   optionId: string,
-): Promise<{ myOptionId: string; voteCount: number }> {
+): Promise<{ myOptionId: string | null; textResponse: string | null; voteCount: number }> {
   return publicRequest('/api/join/votes', {
     method: 'POST',
     headers: participantAuth(code),
     body: JSON.stringify({ optionId }),
+  });
+}
+
+export function submitWrittenAnswer(
+  code: string,
+  textResponse: string,
+): Promise<{ myOptionId: string | null; textResponse: string | null; voteCount: number }> {
+  return publicRequest('/api/join/votes', {
+    method: 'POST',
+    headers: participantAuth(code),
+    body: JSON.stringify({ textResponse }),
   });
 }
 

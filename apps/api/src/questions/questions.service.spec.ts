@@ -14,6 +14,7 @@ function storedQuestion(overrides: Record<string, unknown> = {}) {
     id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     sessionId,
     prompt: 'What is 2 + 2?',
+    kind: 'CHOICE',
     position: 1,
     createdAt: new Date('2026-10-08T08:00:00.000Z'),
     updatedAt: new Date('2026-10-08T08:00:00.000Z'),
@@ -106,6 +107,24 @@ describe('QuestionsService', () => {
     expect(questionCreate.mock.calls[0]?.[0].data.position).toBe(3);
     expect(correctCreate).not.toHaveBeenCalled();
     expect(view.correctOptionId).toBeNull();
+  });
+
+  it('stores a written question without options', async () => {
+    questionAggregate.mockResolvedValue({ _max: { position: null } });
+    questionCreate.mockResolvedValue({ id: 'q1' });
+    questionFindFirst.mockResolvedValue(
+      storedQuestion({ id: 'q1', kind: 'TEXT', options: [], correctAnswer: null }),
+    );
+
+    const view = await service.create(ownerId, sessionId, {
+      prompt: 'Name a color',
+      kind: 'TEXT',
+    });
+
+    expect(optionCreate).not.toHaveBeenCalled();
+    expect(correctCreate).not.toHaveBeenCalled();
+    expect(questionCreate.mock.calls[0]?.[0].data.kind).toBe('TEXT');
+    expect(view.kind).toBe('TEXT');
   });
 
   it('rejects a correct option that is outside the answer list', async () => {

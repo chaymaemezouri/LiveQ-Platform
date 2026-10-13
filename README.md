@@ -2,7 +2,7 @@
 
 Real-time audience interaction for scientific conferences, lectures, workshops, and training sessions.
 
-This repository is at **Phase 5**: speakers can open a question for live voting, participants answer once over Socket.IO, and each conference has a statistics dashboard with PDF and Excel export. Projector mode is not implemented yet.
+This repository is at **Phase 6**: speakers can open a question for live voting, project a clean room screen with a join code and a per-question countdown, and review each conference from the statistics dashboard.
 
 ## Repository layout
 
@@ -114,7 +114,9 @@ A participant joins with that code and an optional nickname. No account is requi
 
 A question has two to six options. `correctOptionIndex` selects one of those options. Omitting it, or sending null, stores an ungraded opinion poll in `correct_answers` by leaving that table empty. Questions that already have votes cannot be edited or deleted. Question routes are authenticated, so the correct option is available only to the session owner.
 
-A speaker opens one question at a time. Participants receive it over Socket.IO and can vote once. The speaker sees the submitted-vote count immediately. Closing voting stops new votes. Publishing results sends the chart, the percentages, and—only then—the correct option. Opinion polls publish with no correct option. The next question opens only after the current results are published. Ending a session closes any open vote. Refreshing or reconnecting restores the same live state.
+A speaker opens one question at a time. Each question can have a countdown from 5 to 600 seconds. When the time runs out, voting closes on its own. Participants receive the question over Socket.IO and can vote once. The speaker sees the submitted-vote count immediately. Closing voting stops new votes. Publishing results sends the chart, the percentages, and—only then—the correct option. Opinion polls publish with no correct option. The next question opens only after the current results are published. Ending a session closes any open vote. Refreshing or reconnecting restores the same live state.
+
+`/app/present/:sessionId` is the screen to share with the room. It shows the conference title and a large join code, then the open question and its answers with the countdown. It does not show the speaker account, statistics, or delete controls. From the session desk, Show join code and Show question switch that window. Share only the projector window.
 
 Each conference has a speaker-only report. Participation is the share of people who submitted at least one vote. Voting is the share of possible votes that were cast on questions the speaker opened. The correct-answer rate uses published graded questions only. Charts and the correct option appear after results are published; an unpublished question keeps its vote count and hides the answer split. Ended conferences stay in Reports. The same numbers download as PDF and Excel.
 
@@ -134,10 +136,4 @@ Notable integrity rules already in the schema:
 - A vote’s option, participant, and question run must belong to the same question and session.
 - `question_runs.open_session_id` is unique. While a run is open it holds the session id; when the run closes it is set to null. That allows one open question per session.
 
-## What is intentionally deferred
-
-| Later phase | Not in this build           |
-| ----------- | --------------------------- |
-| 6           | Projector presentation mode |
-
-Published question results and conference reports use Recharts. PDF and Excel exports list the same figures without a chart image.
+Published question results, the projector, and conference reports use the same figures. PDF and Excel exports list those figures without a chart image. `timer_seconds` and `closes_at` were already on `question_runs`, so the countdown does not add a migration.

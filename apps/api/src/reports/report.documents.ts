@@ -70,8 +70,13 @@ export function renderReportPdf(report: SessionReport): Promise<Buffer> {
         doc.text(`Correct answers: ${question.correctPercent}%`);
       } else if (question.graded) {
         doc.text('No votes on this graded question.');
+      } else if (question.kind === 'TEXT') {
+        doc.text('Written answers');
       } else {
         doc.text('Opinion poll');
+      }
+      for (const response of question.responses) {
+        doc.text(`• ${response}`);
       }
       for (const option of question.options) {
         const mark = option.optionId === question.correctOptionId ? ' (correct)' : '';
@@ -126,7 +131,7 @@ export async function renderReportWorkbook(report: SessionReport): Promise<Buffe
       question.position,
       question.prompt,
       question.published ? 'Yes' : 'No',
-      question.graded ? 'Graded' : 'Opinion poll',
+      question.kind === 'TEXT' ? 'Written answer' : question.graded ? 'Graded' : 'Opinion poll',
       question.voteCount,
       question.votingPercent,
       question.correctPercent ?? '',
@@ -154,6 +159,22 @@ export async function renderReportWorkbook(report: SessionReport): Promise<Buffe
         option.percent,
         option.optionId === question.correctOptionId ? 'Yes' : '',
       ]);
+    }
+  }
+
+  const written = workbook.addWorksheet('Written answers');
+  written.columns = [
+    { header: 'Question', key: 'question', width: 12 },
+    { header: 'Prompt', key: 'prompt', width: 48 },
+    { header: 'Answer', key: 'answer', width: 48 },
+  ];
+  written.getRow(1).font = { bold: true };
+  for (const question of report.questions) {
+    if (!question.published || question.kind !== 'TEXT') {
+      continue;
+    }
+    for (const response of question.responses) {
+      written.addRow([question.position, question.prompt, response]);
     }
   }
 

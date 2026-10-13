@@ -41,11 +41,15 @@ export function QuestionEditorPage() {
 
   const save = useMutation({
     mutationFn: () => {
-      const input = {
-        prompt: draft.prompt.trim(),
-        options: draft.options.map((label) => ({ label: label.trim() })),
-        correctOptionIndex: draft.ungraded ? null : draft.correctIndex,
-      };
+      const input =
+        draft.kind === 'TEXT'
+          ? { prompt: draft.prompt.trim(), kind: 'TEXT' as const }
+          : {
+              prompt: draft.prompt.trim(),
+              kind: 'CHOICE' as const,
+              options: draft.options.map((label) => ({ label: label.trim() })),
+              correctOptionIndex: draft.ungraded ? null : draft.correctIndex,
+            };
       return questionId
         ? updateQuestion(sessionId, questionId, input)
         : createQuestion(sessionId, input);
@@ -110,8 +114,8 @@ export function QuestionEditorPage() {
       </p>
       <h1 className="mt-2 text-3xl">{questionId ? 'Edit question' : 'New question'}</h1>
       <p className="text-muted-foreground mt-2 max-w-2xl text-sm leading-6">
-        Use two to six options. Leave it as an opinion poll when there is no correct
-        answer.
+        Choice questions use two to six options. A written question asks each
+        participant to type an answer.
       </p>
 
       {questionId && existing.isPending ? (
@@ -142,6 +146,40 @@ export function QuestionEditorPage() {
                 {error}
               </p>
             ) : null}
+            <fieldset className="space-y-2" disabled={locked}>
+              <legend className="text-sm font-medium">Answer type</legend>
+              <div className="flex flex-wrap gap-2">
+                <label className="border-border has-checked:border-primary has-checked:bg-primary/5 flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm">
+                  <input
+                    type="radio"
+                    name="answer-type"
+                    className="accent-primary size-4"
+                    checked={draft.kind === 'CHOICE'}
+                    onChange={() =>
+                      setDraft((current) => ({ ...current, kind: 'CHOICE' }))
+                    }
+                  />
+                  Choices
+                </label>
+                <label className="border-border has-checked:border-primary has-checked:bg-primary/5 flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm">
+                  <input
+                    type="radio"
+                    name="answer-type"
+                    className="accent-primary size-4"
+                    checked={draft.kind === 'TEXT'}
+                    onChange={() =>
+                      setDraft((current) => ({
+                        ...current,
+                        kind: 'TEXT',
+                        ungraded: true,
+                        correctIndex: null,
+                      }))
+                    }
+                  />
+                  Written answer
+                </label>
+              </div>
+            </fieldset>
             <div className="space-y-2">
               <Label htmlFor="prompt">Question</Label>
               <Textarea
@@ -155,6 +193,8 @@ export function QuestionEditorPage() {
                 required
               />
             </div>
+            {draft.kind === 'TEXT' ? null : (
+            <>
             <fieldset className="space-y-3" disabled={locked}>
               <legend className="text-sm font-medium">Options</legend>
               {draft.options.map((label, index) => (
@@ -223,6 +263,8 @@ export function QuestionEditorPage() {
               />
               Ungraded opinion poll
             </label>
+            </>
+            )}
             {locked ? null : (
               <div className="flex flex-wrap gap-3">
                 <Button
@@ -255,6 +297,11 @@ function QuestionPreview({ draft }: { draft: QuestionDraft }) {
       <p className="mt-3 text-sm leading-6">
         {draft.prompt.trim() || 'The question will appear here.'}
       </p>
+      {draft.kind === 'TEXT' ? (
+        <p className="text-muted-foreground mt-4 text-sm">
+          Participants type their own answer.
+        </p>
+      ) : (
       <ul className="mt-4 space-y-2">
         {draft.options.map((label, index) => {
           const selected = !draft.ungraded && draft.correctIndex === index;
@@ -269,10 +316,13 @@ function QuestionPreview({ draft }: { draft: QuestionDraft }) {
           );
         })}
       </ul>
+      )}
       <p className="text-muted-foreground mt-4 text-xs">
-        {draft.ungraded
-          ? 'Opinion poll. No answer is marked correct.'
-          : 'Participants will not see which option is correct.'}
+        {draft.kind === 'TEXT'
+          ? 'Written answers stay hidden until you publish the results.'
+          : draft.ungraded
+            ? 'Opinion poll. No answer is marked correct.'
+            : 'Participants will not see which option is correct.'}
       </p>
     </aside>
   );
@@ -284,6 +334,7 @@ function draftFromQuestion(question: Question): QuestionDraft {
   );
   return {
     prompt: question.prompt,
+    kind: question.kind === 'TEXT' ? 'TEXT' : 'CHOICE',
     options: question.options.map((option) => option.label),
     ungraded: question.correctOptionId == null,
     correctIndex: correctIndex >= 0 ? correctIndex : null,

@@ -2,8 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ResultChart } from '@/components/result-chart';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { fetchQuestions } from '@/lib/api';
 import { ApiError } from '@/lib/http';
+import { postPresentView } from '@/lib/present-channel';
 import {
   closeVoting,
   fetchLiveState,
@@ -24,6 +27,7 @@ export function LiveDesk({
   const queryClient = useQueryClient();
   const [connected, setConnected] = useState(true);
   const [error, setError] = useState('');
+  const [seconds, setSeconds] = useState('30');
   const live = useQuery({
     queryKey: ['live', sessionId],
     queryFn: () => fetchLiveState(sessionId),
@@ -71,6 +75,17 @@ export function LiveDesk({
       setError(caught instanceof ApiError ? caught.message : 'The live update failed.'),
   });
 
+  function readTimer(): number | null | 'invalid' {
+    if (!seconds.trim()) {
+      return null;
+    }
+    const value = Number(seconds);
+    if (!Number.isInteger(value) || value < 5 || value > 600) {
+      return 'invalid';
+    }
+    return value;
+  }
+
   const state = live.data;
   const asked = new Set(state?.askedQuestionIds ?? []);
   const upcoming = (questions.data ?? []).filter((question) => !asked.has(question.id));
@@ -116,7 +131,25 @@ export function LiveDesk({
           <p className="mt-3 text-sm" role="status">
             {state.voteCount} {state.voteCount === 1 ? 'vote' : 'votes'} submitted
           </p>
-          {state.phase === 'published' && state.results ? (
+          {state.question.kind === 'TEXT' ? (
+            state.phase === 'published' && state.responses ? (
+              <ul className="mt-4 space-y-2">
+                {state.responses.length === 0 ? (
+                  <li className="text-muted-foreground text-sm">No written answers.</li>
+                ) : (
+                  state.responses.map((response, index) => (
+                    <li key={index} className="border-border rounded-md border px-3 py-2 text-sm">
+                      {response}
+                    </li>
+                  ))
+                )}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground mt-4 text-sm">
+                Written answers stay hidden until you publish the results.
+              </p>
+            )
+          ) : state.phase === 'published' && state.results ? (
             <ResultChart
               results={state.results}
               correctOptionId={state.correctOptionId}
@@ -136,45 +169,90 @@ export function LiveDesk({
         </div>
       ) : null}
       {sessionStatus === 'ACTIVE' ? (
-        <div className="mt-5 flex flex-wrap gap-3">
-          {state?.phase === 'open' ? (
-            <Button
-              onClick={() => run.mutate(() => closeVoting(sessionId))}
-              disabled={run.isPending}
-            >
-              Close voting
+        <div className="mt-5 space-y-4">
+          <div className="flex max-w-xs flex-col gap-2">
+            <Label htmlFor="question-seconds">Seconds for this question</Label>
+            <Input
+              id="question-seconds"
+              inputMode="numeric"
+              value={seconds}
+              onChange={(event) => setSeconds(event.target.value)}
+              placeholder="Empty for no timer"
+            />
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="outline" asChild>
+              <a href={`/app/present/${sessionId}`} target="_blank" rel="noreferrer">
+                Open projector
+              </a>
             </Button>
-          ) : null}
-          {state?.phase === 'closed' ? (
             <Button
-              onClick={() => run.mutate(() => publishResults(sessionId))}
-              disabled={run.isPending}
+              variant="outline"
+              onClick={() => postPresentView(sessionId, 'code')}
             >
-              Publish results
+              Show join code
             </Button>
-          ) : null}
-          {state?.phase === 'published' && hasLater ? (
             <Button
-              onClick={() => run.mutate(() => nextQuestion(sessionId))}
-              disabled={run.isPending}
+              variant="outline"
+              onClick={() => postPresentView(sessionId, 'question')}
             >
-              Next question
+              Show question
             </Button>
-          ) : null}
-          {state && (state.phase === 'idle' || state.phase === 'published')
-            ? upcoming.map((question) => (
-                <Button
-                  key={question.id}
-                  variant="outline"
-                  onClick={() =>
-                    run.mutate(() => launchQuestion(sessionId, question.id))
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {state?.phase === 'open' ? (
+              <Button
+                onClick={() => run.mutate(() => closeVoting(sessionId))}
+                disabled={run.isPending}
+              >
+                Close voting
+              </Button>
+            ) : null}
+            {state?.phase === 'closed' ? (
+              <Button
+                onClick={() => run.mutate(() => publishResults(sessionId))}
+                disabled={run.isPending}
+              >
+                Publish results
+              </Button>
+            ) : null}
+            {state?.phase === 'published' && hasLater ? (
+              <Button
+                onClick={() => {
+                  const timer = readTimer();
+                  if (timer === 'invalid') {
+                    setError('Use a time from 5 to 600 seconds, or leave it empty.');
+                    return;
                   }
-                  disabled={run.isPending}
-                >
-                  Open “{question.prompt}”
-                </Button>
-              ))
-            : null}
+                  run.mutate(() => nextQuestion(sessionId, timer));
+                }}
+                disabled={run.isPending}
+              >
+                Next question
+              </Button>
+            ) : null}
+            {state && (state.phase === 'idle' || state.phase === 'published')
+              ? upcoming.map((question) => (
+                  <Button
+                    key={question.id}
+                    variant="outline"
+                    onClick={() => {
+                      const timer = readTimer();
+                      if (timer === 'invalid') {
+                        setError(
+                          'Use a time from 5 to 600 seconds, or leave it empty.',
+                        );
+                        return;
+                      }
+                      run.mutate(() => launchQuestion(sessionId, question.id, timer));
+                    }}
+                    disabled={run.isPending}
+                  >
+                    Open “{question.prompt}”
+                  </Button>
+                ))
+              : null}
+          </div>
         </div>
       ) : null}
     </section>
