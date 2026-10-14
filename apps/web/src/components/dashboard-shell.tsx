@@ -18,7 +18,7 @@ export function DashboardShell() {
     <div className="min-h-screen md:grid md:grid-cols-[15.5rem_minmax(0,1fr)]">
       <aside className="border-border bg-card border-b md:border-r md:border-b-0">
         <div className="flex items-center justify-between px-5 py-4">
-          <p className="font-serif text-2xl leading-none text-red-600">LiveQ</p>
+          <p className="font-serif text-2xl leading-none text-yellow-500">LiveQ</p>
           <ThemeToggle />
         </div>
         <nav

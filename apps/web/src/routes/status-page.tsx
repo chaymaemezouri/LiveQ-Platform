@@ -27,7 +27,7 @@ export function StatusPage() {
       <header className="border-border border-b">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <div>
-            <p className="font-serif text-2xl leading-none text-red-600">LiveQ</p>
+            <p className="font-serif text-2xl leading-none text-yellow-500">LiveQ</p>
             <p className="text-muted-foreground mt-1 text-sm">
               Conference and training platform
             </p>

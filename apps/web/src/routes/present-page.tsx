@@ -88,12 +88,12 @@ export function PresentPage() {
       <div className="pointer-events-none absolute -right-16 bottom-0 size-80 rounded-full bg-amber-100/80 blur-3xl" />
       <header className="relative flex items-center justify-between gap-4">
         <p className="flex items-center gap-3 font-serif text-2xl sm:text-3xl">
-          <span className="h-8 w-1.5 rounded-full bg-red-600" />
+          <span className="h-8 w-1.5 rounded-full bg-yellow-500" />
           {session.data?.title ?? 'LiveQ'}
         </p>
         <p className="text-xs tracking-[0.35em] text-slate-400 uppercase">
-          <span className="text-red-600">LiveQ</span>{' '}
-          <span className="ml-1 inline-block size-2 rounded-full bg-red-600" />
+          <span className="text-yellow-500">LiveQ</span>{' '}
+          <span className="ml-1 inline-block size-2 rounded-full bg-yellow-500" />
         </p>
       </header>
 
