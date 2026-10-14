@@ -1,0 +1,47 @@
+
+name: Deploy LiveQ
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: liveq-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          PRIVATE_KEY: ${{ secrets.LIVEQ_SSH_PRIVATE_KEY }}
+          HOST_KEY: ${{ secrets.LIVEQ_SSH_HOST_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PRIVATE_KEY" > ~/.ssh/liveq_deploy
+          chmod 600 ~/.ssh/liveq_deploy
+          printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          HOST: ${{ secrets.LIVEQ_SSH_HOST }}
+          USERNAME: ${{ secrets.LIVEQ_SSH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/liveq_deploy \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o BatchMode=yes \
+            "$USERNAME@$HOST" \
+            "deploy $GITHUB_SHA"
