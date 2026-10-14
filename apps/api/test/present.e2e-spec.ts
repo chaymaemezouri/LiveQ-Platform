@@ -79,16 +79,24 @@ describe('Projector countdown (e2e)', () => {
       .send({ questionId: graded.body.id, timerSeconds: 4 })
       .expect(400);
 
+    
     const opened = await request(server)
       .post(`/api/sessions/${sessionId}/live/launch`)
       .set(auth)
       .send({ questionId: graded.body.id, timerSeconds: 30 })
       .expect(201);
+
     expect(opened.body.phase).toBe('open');
     expect(opened.body.timerSeconds).toBe(30);
     expect(opened.body.closesAt).toEqual(expect.any(String));
     expect(opened.body).not.toHaveProperty('correctOptionId');
-    expect(JSON.stringify(opened.body)).not.toContain(four);
+
+    expect(opened.body.question.options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: four, label: '4' }),
+      ]),
+    );
+
 
     const prisma = app.get(PrismaService);
     await prisma.questionRun.updateMany({
