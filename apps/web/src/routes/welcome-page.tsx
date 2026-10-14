@@ -13,7 +13,7 @@ export function WelcomePage() {
   return (
     <div className="min-h-screen">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-        <p className="font-serif text-2xl">LiveQ</p>
+        <p className="font-serif text-2xl text-red-600">LiveQ</p>
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Button variant="outline" asChild>

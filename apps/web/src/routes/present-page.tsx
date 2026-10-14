@@ -92,7 +92,8 @@ export function PresentPage() {
           {session.data?.title ?? 'LiveQ'}
         </p>
         <p className="text-xs tracking-[0.35em] text-slate-400 uppercase">
-          LiveQ <span className="ml-1 inline-block size-2 rounded-full bg-blue-500" />
+          <span className="text-red-600">LiveQ</span>{' '}
+          <span className="ml-1 inline-block size-2 rounded-full bg-red-600" />
         </p>
       </header>
 

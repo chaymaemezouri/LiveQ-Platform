@@ -19,70 +19,105 @@ export function renderReportPdf(report: SessionReport): Promise<Buffer> {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    doc.fontSize(22).text('LiveQ report');
-    doc.moveDown(0.4);
-    doc.fontSize(16).text(report.title);
-    doc.moveDown(0.4);
-    doc.fontSize(11).fillColor('#444444');
-    doc.text(`Status: ${labelStatus(report.status)}`);
-    doc.text(`Started: ${report.startedAt ?? 'Not yet'}`);
-    doc.text(`Ended: ${report.endedAt ?? 'Not yet'}`);
-    doc.moveDown();
-    doc.fillColor('#000000').fontSize(13).text('Conference statistics');
-    doc.moveDown(0.3);
-    doc.fontSize(11);
-    doc.text(`Participants: ${report.participantCount}`);
-    doc.text(`Participation: ${report.participationPercent}%`);
-    doc.text(`Voting: ${report.votingPercent}%`);
-    doc.text(`Correct answers: ${formatPercent(report.correctPercent)}`);
-    doc.text(
-      `Questions: ${report.publishedQuestionCount} published of ${report.questionCount}`,
-    );
-    doc.text(`Votes submitted: ${report.voteCount}`);
-    doc.moveDown();
+    const left = 48;
+    const width = 499;
+    const tones = ['#3b82f6', '#f43f5e', '#10b981', '#8b5cf6', '#f59e0b'];
+    let y = 108;
+
+    doc.rect(0, 0, 595, 96).fill('#eff6ff');
+    doc.rect(left, 34, 4, 28).fill('#2563eb');
+    doc.fillColor('#0f172a').fontSize(20).text(report.title, 60, 30, { width: 470 });
+    doc
+      .fillColor('#64748b')
+      .fontSize(9)
+      .text(
+        `${labelStatus(report.status)} · Started ${report.startedAt ?? 'not yet'} · Ended ${report.endedAt ?? 'not yet'}`,
+        60,
+        58,
+        { width: 470 },
+      );
+
+    const stats: [string, string, string][] = [
+      ['Participants', String(report.participantCount), '#3b82f6'],
+      ['Participation', `${report.participationPercent}%`, '#10b981'],
+      ['Voting', `${report.votingPercent}%`, '#f59e0b'],
+      ['Correct', formatPercent(report.correctPercent), '#8b5cf6'],
+    ];
+    const cardW = (width - 18) / 4;
+    for (const [index, stat] of stats.entries()) {
+      const x = left + index * (cardW + 6);
+      doc.roundedRect(x, y, cardW, 48, 8).fill('#f8fafc');
+      doc.rect(x, y + 8, 3, 32).fill(stat[2]);
+      doc.fillColor('#64748b').fontSize(7).text(stat[0], x + 10, y + 8, { width: cardW - 16 });
+      doc.fillColor('#0f172a').fontSize(14).text(stat[1], x + 10, y + 22, { width: cardW - 16 });
+    }
+    y += 62;
+    doc
+      .fillColor('#64748b')
+      .fontSize(9)
+      .text(
+        `${report.publishedQuestionCount} of ${report.questionCount} questions published · ${report.voteCount} votes submitted`,
+        left,
+        y,
+        { width },
+      );
+    y = doc.y + 16;
 
     if (report.questions.length === 0) {
-      doc.text('This conference has no questions yet.');
+      doc.fillColor('#64748b').fontSize(11).text('This conference has no questions yet.', left, y);
     }
 
     for (const question of report.questions) {
+      if (y > 740) {
+        doc.addPage();
+        y = 48;
+      }
+      const tone = tones[(question.position - 1) % tones.length] ?? '#3b82f6';
+      doc.circle(left + 6, y + 8, 4).fill(tone);
+      doc.fillColor('#0f172a').fontSize(12).text(question.prompt, left + 16, y, { width: width - 16 });
+      y = doc.y + 2;
+      const kind =
+        question.kind === 'TEXT' ? 'Written answer' : question.graded ? 'Graded' : 'Opinion poll';
       doc
-        .fontSize(13)
-        .fillColor('#000000')
-        .text(`${question.position}. ${question.prompt}`);
-      doc.moveDown(0.2);
-      doc.fontSize(11);
+        .fillColor('#64748b')
+        .fontSize(8)
+        .text(
+          `Question ${question.position} · ${kind} · ${question.votingPercent}% voted · ${question.voteCount} votes${question.correctPercent === null ? '' : ` · ${question.correctPercent}% correct`}`,
+          left + 16,
+          y,
+          { width: width - 16 },
+        );
+      y = doc.y + 6;
       if (!question.published) {
         doc
-          .fillColor('#444444')
-          .text(
-            `Results not published. ${question.voteCount} ${question.voteCount === 1 ? 'vote' : 'votes'} submitted.`,
-          );
-        doc.moveDown();
+          .fillColor('#64748b')
+          .fontSize(9)
+          .text('Results are not published, so the answer split stays hidden.', left + 16, y, {
+            width: width - 16,
+          });
+        y = doc.y + 14;
         continue;
       }
-      doc
-        .fillColor('#000000')
-        .text(
-          `Voting: ${question.votingPercent}% · ${question.voteCount} ${question.voteCount === 1 ? 'vote' : 'votes'}`,
-        );
-      if (question.correctPercent !== null) {
-        doc.text(`Correct answers: ${question.correctPercent}%`);
-      } else if (question.graded) {
-        doc.text('No votes on this graded question.');
-      } else if (question.kind === 'TEXT') {
-        doc.text('Written answers');
-      } else {
-        doc.text('Opinion poll');
-      }
       for (const response of question.responses) {
-        doc.text(`• ${response}`);
+        doc.fillColor('#0f172a').fontSize(9).text(response, left + 16, y, { width: width - 16 });
+        y = doc.y + 4;
       }
-      for (const option of question.options) {
-        const mark = option.optionId === question.correctOptionId ? ' (correct)' : '';
-        doc.text(`• ${option.label}${mark}: ${option.count} (${option.percent}%)`);
-      }
-      doc.moveDown();
+      question.options.forEach((option, index) => {
+        const color = tones[index % tones.length] ?? '#3b82f6';
+        const mark = option.optionId === question.correctOptionId ? '  CORRECT' : '';
+        doc.fillColor('#0f172a').fontSize(8).text(`${option.label}${mark}`, left + 16, y, {
+          width: width - 90,
+        });
+        doc.text(`${option.percent}% · ${option.count}`, left + width - 70, y, { width: 70, align: 'right' });
+        y = doc.y + 2;
+        const bar = width - 32;
+        doc.roundedRect(left + 16, y, bar, 4, 2).fill('#e2e8f0');
+        if (option.percent > 0) {
+          doc.roundedRect(left + 16, y, Math.max(4, (bar * option.percent) / 100), 4, 2).fill(color);
+        }
+        y += 12;
+      });
+      y += 8;
     }
 
     doc.end();
