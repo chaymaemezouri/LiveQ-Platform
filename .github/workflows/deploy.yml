@@ -4,6 +4,11 @@ name: Deploy LiveQ
 on:
   workflow_dispatch:
 
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
 permissions:
   contents: read
 
@@ -13,12 +18,44 @@ concurrency:
 
 jobs:
   deploy:
+    name: Deploy to Hostinger VPS
+
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.repository.full_name == github.repository &&
+        github.event.workflow_run.head_repository.full_name == github.repository
+      )
+
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Determine deployment commit
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            SHA="$TESTED_SHA"
+          else
+            SHA="$CURRENT_SHA"
+          fi
+
+          if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid commit SHA"
+            exit 1
+          fi
+
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Deploying commit: $SHA"
 
       - name: Configure SSH
         env:
@@ -26,22 +63,43 @@ jobs:
           HOST_KEY: ${{ secrets.LIVEQ_SSH_HOST_KEY }}
         run: |
           set -euo pipefail
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
+
           printf '%s\n' "$PRIVATE_KEY" > ~/.ssh/liveq_deploy
           chmod 600 ~/.ssh/liveq_deploy
+
           printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Deploy
+      - name: Deploy LiveQ
         env:
           HOST: ${{ secrets.LIVEQ_SSH_HOST }}
           USERNAME: ${{ secrets.LIVEQ_SSH_USER }}
+          DEPLOY_SHA: ${{ steps.version.outputs.sha }}
         run: |
           set -euo pipefail
+
           ssh -i ~/.ssh/liveq_deploy \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             -o BatchMode=yes \
+            -o ConnectTimeout=15 \
             "$USERNAME@$HOST" \
-            "deploy $GITHUB_SHA"
+            "deploy $DEPLOY_SHA"
+
+      - name: Verify production HTTPS
+        run: |
+          set -euo pipefail
+
+          curl --fail --silent --show-error \
+            --max-time 20 \
+            https://liveq.academyskills.net/api/health
+
+          curl --fail --silent --show-error \
+            --output /dev/null \
+            --max-time 20 \
+            https://liveq.academyskills.net/
+
+          echo "LiveQ production HTTPS checks passed."
