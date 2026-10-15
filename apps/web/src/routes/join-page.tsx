@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { BrandMark } from '@/components/brand-mark';
 import { ParticipantLive } from '@/components/participant-live';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
@@ -236,8 +237,8 @@ function JoinShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen">
       <header className="mx-auto flex max-w-md items-center justify-between px-6 py-4">
-        <Link to="/" className="font-serif text-2xl text-yellow-500">
-          LiveQ
+        <Link to="/" aria-label="LiveQ">
+          <BrandMark className="h-11" />
         </Link>
         <ThemeToggle />
       </header>

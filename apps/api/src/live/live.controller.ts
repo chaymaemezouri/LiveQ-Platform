@@ -81,6 +81,11 @@ export class ParticipantLiveController {
     return this.liveService.participantState(participant.id, participant.sessionId);
   }
 
+  @Get('review')
+  review(@CurrentParticipant() participant: ParticipantIdentity) {
+    return this.liveService.participantReview(participant.id, participant.sessionId);
+  }
+
   @Post('votes')
   vote(
     @CurrentParticipant() participant: ParticipantIdentity,

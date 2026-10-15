@@ -3,6 +3,7 @@ import type {
   LiveResultView,
   LiveRunSource,
   LiveSessionStatus,
+  ParticipantReview,
 } from './live.types';
 
 export function resultBars(
@@ -89,4 +90,40 @@ export function presentLiveState(input: {
     correctOptionId:
       kind === 'TEXT' ? null : (input.run.question.correctAnswer?.optionId ?? null),
   };
+}
+
+export function presentParticipantReview(input: {
+  questionCount: number;
+  runs: LiveRunSource[];
+  votes: { questionId: string; optionId: string | null; textResponse: string | null }[];
+}): ParticipantReview {
+  const mine = new Map(input.votes.map((vote) => [vote.questionId, vote]));
+  const items = input.runs.flatMap((run) => {
+    const state = presentLiveState({
+      sessionStatus: 'ACTIVE',
+      askedQuestionIds: [],
+      run,
+    });
+    if (!state.question || state.phase === 'idle') {
+      return [];
+    }
+    const vote = mine.get(state.question.questionId);
+    return [
+      {
+        runId: state.question.runId,
+        questionId: state.question.questionId,
+        prompt: state.question.prompt,
+        position: state.question.position,
+        kind: state.question.kind,
+        phase: state.phase,
+        options: state.question.options,
+        myOptionId: vote?.optionId ?? null,
+        myText: vote?.textResponse?.trim() ? vote.textResponse.trim() : null,
+        results: state.results,
+        responses: state.responses,
+        correctOptionId: state.correctOptionId ?? null,
+      },
+    ];
+  });
+  return { questionCount: input.questionCount, items };
 }

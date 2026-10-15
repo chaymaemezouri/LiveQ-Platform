@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { BrandMark } from '@/components/brand-mark';
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
   Card,
@@ -27,7 +28,7 @@ export function StatusPage() {
       <header className="border-border border-b">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <div>
-            <p className="font-serif text-2xl leading-none text-yellow-500">LiveQ</p>
+            <BrandMark className="h-11" />
             <p className="text-muted-foreground mt-1 text-sm">
               Conference and training platform
             </p>

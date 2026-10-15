@@ -41,6 +41,26 @@ export interface ParticipantLiveState extends LivePublicState {
   myText: string | null;
 }
 
+export interface ParticipantReviewItem {
+  runId: string;
+  questionId: string;
+  prompt: string;
+  position: number;
+  kind: 'CHOICE' | 'TEXT';
+  phase: Exclude<LivePhase, 'idle'>;
+  options: LiveOptionView[];
+  myOptionId: string | null;
+  myText: string | null;
+  results: LiveResultView[] | null;
+  responses: string[] | null;
+  correctOptionId: string | null;
+}
+
+export interface ParticipantReview {
+  questionCount: number;
+  items: ParticipantReviewItem[];
+}
+
 export interface LiveIdentity {
   role: 'speaker' | 'participant';
   sessionId: string;

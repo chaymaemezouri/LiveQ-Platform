@@ -1,4 +1,4 @@
-import { presentLiveState, resultBars } from './live.presenter';
+import { presentLiveState, presentParticipantReview, resultBars } from './live.presenter';
 import type { LiveRunSource } from './live.types';
 
 const correctOptionId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -146,6 +146,37 @@ describe('live presentation', () => {
     expect(shown.responses).toEqual(['blue']);
     expect(shown.results).toBeNull();
     expect(shown.correctOptionId).toBeNull();
+  });
+
+  it('lets a participant revisit an answer without revealing unpublished results', () => {
+    const hidden = presentParticipantReview({
+      questionCount: 2,
+      runs: [run({ status: 'CLOSED' })],
+      votes: [{ questionId: 'question-1', optionId: otherOptionId, textResponse: null }],
+    });
+
+    expect(hidden.items[0]?.phase).toBe('closed');
+    expect(hidden.items[0]?.myOptionId).toBe(otherOptionId);
+    expect(hidden.items[0]?.results).toBeNull();
+    expect(hidden.items[0]?.responses).toBeNull();
+    expect(hidden.items[0]?.correctOptionId).toBeNull();
+
+    const shown = presentParticipantReview({
+      questionCount: 2,
+      runs: [
+        run({
+          status: 'CLOSED',
+          resultsPublishedAt: new Date('2026-10-08T12:00:00.000Z'),
+        }),
+      ],
+      votes: [{ questionId: 'question-1', optionId: otherOptionId, textResponse: null }],
+    });
+
+    expect(shown.items[0]?.results?.map((item) => item.optionId)).toEqual([
+      otherOptionId,
+      correctOptionId,
+    ]);
+    expect(shown.items[0]?.correctOptionId).toBe(correctOptionId);
   });
 
   it('rounds an empty tally to zero percent', () => {

@@ -90,6 +90,32 @@ export function fetchParticipantLive(code: string): Promise<ParticipantLiveState
   });
 }
 
+export interface ParticipantReviewItem {
+  runId: string;
+  questionId: string;
+  prompt: string;
+  position: number;
+  kind: 'CHOICE' | 'TEXT';
+  phase: Exclude<LivePhase, 'idle'>;
+  options: LiveOption[];
+  myOptionId: string | null;
+  myText: string | null;
+  results: LiveResult[] | null;
+  responses: string[] | null;
+  correctOptionId: string | null;
+}
+
+export interface ParticipantReview {
+  questionCount: number;
+  items: ParticipantReviewItem[];
+}
+
+export function fetchParticipantReview(code: string): Promise<ParticipantReview> {
+  return publicRequest<ParticipantReview>('/api/join/review', {
+    headers: participantAuth(code),
+  });
+}
+
 export function castVote(
   code: string,
   optionId: string,

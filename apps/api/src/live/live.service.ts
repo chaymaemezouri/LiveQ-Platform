@@ -11,7 +11,7 @@ import { Prisma } from '../generated/prisma/client';
 import { hashParticipantToken } from '../participants/participant-token';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CastVoteDto } from './dto/cast-vote.dto';
-import { presentLiveState } from './live.presenter';
+import { presentLiveState, presentParticipantReview } from './live.presenter';
 import type {
   LiveBroadcast,
   LiveIdentity,
@@ -124,6 +124,23 @@ export class LiveService implements OnModuleInit {
     const state = await this.publicState(sessionId);
     const mine = await this.myAnswer(participantId, state);
     return { ...state, myOptionId: mine.optionId, myText: mine.textResponse };
+  }
+
+  async participantReview(participantId: string, sessionId: string) {
+    await this.closeIfDue(sessionId);
+    const [runs, votes, questionCount] = await Promise.all([
+      this.prisma.questionRun.findMany({
+        where: { sessionId },
+        orderBy: { openedAt: 'asc' },
+        include: runInclude,
+      }),
+      this.prisma.vote.findMany({
+        where: { participantId, sessionId },
+        select: { questionId: true, optionId: true, textResponse: true },
+      }),
+      this.prisma.question.count({ where: { sessionId } }),
+    ]);
+    return presentParticipantReview({ questionCount, runs, votes });
   }
 
   async launch(

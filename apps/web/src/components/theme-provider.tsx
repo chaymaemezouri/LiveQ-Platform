@@ -9,7 +9,7 @@ function readTheme(): Theme {
     return stored;
   }
 
-  return 'dark';
+  return 'light';
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

@@ -95,9 +95,12 @@ export function LiveDesk({
   );
 
   return (
-    <section className="border-border bg-card mt-10 rounded-xl border p-5 shadow-sm">
+    <section className="mt-10 rounded-3xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-2xl">Live voting</h2>
+        <div>
+          <p className="text-xs font-semibold tracking-[0.16em] text-blue-600 uppercase">LiveQ Studio</p>
+          <h2 className="text-2xl">Live voting</h2>
+        </div>
         {sessionStatus !== 'DRAFT' && !connected ? (
           <p className="text-muted-foreground text-sm" role="status">
             Reconnecting to the live session…

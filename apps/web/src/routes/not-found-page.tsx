@@ -1,10 +1,11 @@
 import { Link } from 'react-router';
+import { BrandMark } from '@/components/brand-mark';
 
 export function NotFoundPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6">
       <p className="text-muted-foreground text-sm font-medium tracking-[0.16em] uppercase">
-        <span className="text-yellow-500">LiveQ</span>
+        <BrandMark className="h-10" />
       </p>
       <h1 className="text-foreground mt-3 text-4xl">This page is not available</h1>
       <p className="text-muted-foreground mt-3 text-base leading-7">

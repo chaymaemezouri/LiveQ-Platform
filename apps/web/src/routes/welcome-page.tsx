@@ -1,5 +1,6 @@
 import { Link, Navigate } from 'react-router';
 import { useAuth } from '@/hooks/use-auth';
+import { BrandMark } from '@/components/brand-mark';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 
@@ -13,7 +14,7 @@ export function WelcomePage() {
   return (
     <div className="min-h-screen">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-        <p className="font-serif text-2xl text-yellow-500">LiveQ</p>
+        <BrandMark />
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Button variant="outline" asChild>

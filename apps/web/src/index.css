@@ -28,12 +28,12 @@
 
 :root {
   --radius: 0.9rem;
-  --background: oklch(0.972 0.01 255);
-  --foreground: oklch(0.21 0.045 262);
+  --background: oklch(0.975 0.012 255);
+  --foreground: oklch(0.27 0.06 262);
   --card: oklch(0.995 0.004 255);
-  --card-foreground: oklch(0.21 0.045 262);
-  --primary: oklch(0.27 0.06 262);
-  --primary-foreground: oklch(0.985 0.004 255);
+  --card-foreground: oklch(0.27 0.06 262);
+  --primary: oklch(0.55 0.2 262);
+  --primary-foreground: oklch(0.99 0.002 255);
   --secondary: oklch(0.96 0.008 255);
   --secondary-foreground: oklch(0.31 0.045 258);
   --muted: oklch(0.962 0.006 255);

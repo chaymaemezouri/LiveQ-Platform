@@ -1,17 +1,11 @@
-import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import type { ReportQuestion, SessionReport } from '@/lib/reports';
 
-const accents = [
-  'bg-blue-500',
-  'bg-rose-500',
-  'bg-emerald-500',
-  'bg-violet-500',
-  'bg-amber-500',
-];
+const bars = ['bg-blue-500', 'bg-violet-500', 'bg-cyan-500', 'bg-orange-500', 'bg-emerald-500'];
 
 export function ReportDashboard({ report }: { report: SessionReport }) {
-  const [openId, setOpenId] = useState<string | null>(report.questions[0]?.questionId ?? null);
+  const [index, setIndex] = useState(0);
+  const question = report.questions[index] ?? report.questions[0];
 
   return (
     <div>
@@ -27,25 +21,58 @@ export function ReportDashboard({ report }: { report: SessionReport }) {
         {report.voteCount} {report.voteCount === 1 ? 'vote' : 'votes'} submitted
       </p>
 
-      {report.questions.length === 0 ? (
+      {report.questions.length === 0 || !question ? (
         <p className="text-muted-foreground mt-8 text-sm">
           This conference has no questions yet.
         </p>
       ) : (
-        <ul className="mt-8 grid gap-3 sm:grid-cols-2">
-          {report.questions.map((question) => (
-            <QuestionCard
-              key={question.questionId}
-              question={question}
-              open={openId === question.questionId}
-              onToggle={() =>
-                setOpenId((current) =>
-                  current === question.questionId ? null : question.questionId,
-                )
-              }
-            />
-          ))}
-        </ul>
+        <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">
+              Select question
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="h-9 rounded-xl border border-slate-200 px-3 text-sm font-medium disabled:opacity-40"
+                disabled={index <= 0}
+                onClick={() => setIndex((current) => Math.max(0, current - 1))}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                className="h-9 rounded-xl border border-slate-200 px-3 text-sm font-medium disabled:opacity-40"
+                disabled={index >= report.questions.length - 1}
+                onClick={() =>
+                  setIndex((current) => Math.min(report.questions.length - 1, current + 1))
+                }
+              >
+                Next
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            {report.questions.map((item, itemIndex) => (
+              <button
+                key={item.questionId}
+                type="button"
+                onClick={() => setIndex(itemIndex)}
+                className={`min-w-16 rounded-2xl border px-3 py-2 text-left ${
+                  itemIndex === index
+                    ? 'border-blue-600 bg-blue-600 text-white'
+                    : 'border-slate-200 bg-slate-50 text-slate-700'
+                }`}
+              >
+                <span className="block text-sm font-semibold">Q{item.position}</span>
+                <span className={`block text-[11px] ${itemIndex === index ? 'text-blue-100' : 'text-slate-400'}`}>
+                  {item.published ? 'Published' : 'Hidden'}
+                </span>
+              </button>
+            ))}
+          </div>
+          <QuestionDetail question={question} total={report.questions.length} />
+        </section>
       )}
     </div>
   );
@@ -63,91 +90,98 @@ function Stat({
   tone: string;
 }) {
   return (
-    <div className="border-border bg-card relative overflow-hidden rounded-2xl border px-4 py-4 shadow-sm">
+    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 py-4 text-slate-900 shadow-sm">
       <span className={`absolute inset-y-0 left-0 w-1.5 ${tone}`} />
-      <p className="text-muted-foreground text-sm">{label}</p>
+      <p className="text-sm text-slate-500">{label}</p>
       <p className="mt-1 font-serif text-3xl">{value}</p>
-      <p className="text-muted-foreground mt-2 text-xs">{hint}</p>
+      <p className="mt-2 text-xs text-slate-400">{hint}</p>
     </div>
   );
 }
 
-function QuestionCard({
-  question,
-  open,
-  onToggle,
-}: {
-  question: ReportQuestion;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  const tone = accents[(question.position - 1) % accents.length] ?? 'bg-blue-500';
+function QuestionDetail({ question, total }: { question: ReportQuestion; total: number }) {
   return (
-    <li className="border-border bg-card overflow-hidden rounded-2xl border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <button type="button" onClick={onToggle} className="flex w-full items-start gap-3 px-4 py-4 text-left">
-        <span className={`mt-1 size-2.5 shrink-0 rounded-full ${tone}`} />
-        <span className="min-w-0 flex-1">
-          <span className="text-muted-foreground block text-xs tracking-wide uppercase">
-            Question {question.position}
-            {question.graded ? ' · Graded' : ' · Opinion poll'}
-          </span>
-          <span className="mt-1 block text-lg leading-snug">{question.prompt}</span>
-          <span className="text-muted-foreground mt-1 block text-sm">
-            {question.votingPercent}% voted · {question.voteCount}{' '}
-            {question.voteCount === 1 ? 'vote' : 'votes'}
-            {question.correctPercent !== null ? ` · ${question.correctPercent}% correct` : ''}
-          </span>
+    <div className="mt-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-semibold tracking-wide text-blue-600 uppercase">
+          Question {question.position} of {total}
+        </p>
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+          {question.published ? 'Results published' : 'Results hidden'}
         </span>
-        <ChevronDown className={`text-muted-foreground size-4 shrink-0 transition ${open ? 'rotate-180' : ''}`} />
-      </button>
+      </div>
+      <h2 className="mt-2 text-2xl leading-snug font-semibold">{question.prompt}</h2>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl bg-slate-50 px-4 py-3">
+          <p className="text-sm text-slate-500">Responses received</p>
+          <p className="mt-1 text-3xl font-semibold text-blue-600">{question.voteCount}</p>
+        </div>
+        <div className="rounded-2xl bg-slate-50 px-4 py-3">
+          <p className="text-sm text-slate-500">Question type</p>
+          <p className="mt-2 text-base font-medium">
+            {question.kind === 'TEXT' ? 'Written answer' : 'Multiple choice'}
+          </p>
+        </div>
+      </div>
       {question.kind === 'TEXT' ? (
         question.published ? (
-          <ul className="space-y-2 px-4 pb-4 text-sm">
+          <ul className="mt-5 space-y-2 text-sm">
             {(question.responses ?? []).length === 0 ? (
-              <li className="text-muted-foreground">No written answers.</li>
+              <li className="text-slate-500">No written answers.</li>
             ) : (
-              question.responses?.map((response, index) => (
-                <li key={`${question.questionId}-${index}`} className="bg-muted/60 rounded-lg px-3 py-2">
+              question.responses?.map((response, responseIndex) => (
+                <li key={`${question.questionId}-${responseIndex}`} className="rounded-xl bg-slate-50 px-3 py-2">
                   {response}
                 </li>
               ))
             )}
           </ul>
         ) : (
-          <p className="text-muted-foreground px-4 pb-4 text-sm">
+          <p className="mt-5 text-sm text-slate-500">
             Results are not published, so the answer split stays hidden.
           </p>
         )
       ) : question.published ? (
-        <figure aria-label="Results" className="space-y-2 px-4 pb-4">
-          {(open ? question.options : question.options.slice(0, 2)).map((option, index) => {
-            const bar = accents[index % accents.length] ?? 'bg-blue-500';
+        <figure aria-label="Results" className="mt-5 space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <p className="font-medium">Answer distribution</p>
+            <p className="text-slate-400">Votes / percent</p>
+          </div>
+          {question.options.map((option, optionIndex) => {
             const correct = option.optionId === question.correctOptionId;
+            const tone = correct ? 'bg-emerald-500' : (bars[optionIndex % bars.length] ?? 'bg-blue-500');
             return (
               <div key={option.optionId}>
-                <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                <div className="mb-1 flex items-center justify-between gap-2 text-sm">
                   <span>
-                    {option.label}
+                    {String.fromCharCode(65 + optionIndex)} {option.label}
                     {correct ? (
-                      <span className="ml-2 tracking-wide uppercase">Correct</span>
+                      <span className="ml-2 text-xs font-semibold tracking-wide text-emerald-600 uppercase">
+                        Correct
+                      </span>
                     ) : null}
                   </span>
-                  <span>
+                  <span className="text-slate-500">
                     {option.percent}% · {option.count}
                   </span>
                 </div>
-                <div className="bg-muted h-1.5 overflow-hidden rounded-full">
-                  <div className={`h-full rounded-full ${bar}`} style={{ width: `${option.percent}%` }} />
+                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className={`h-full rounded-full ${tone}`} style={{ width: `${option.percent}%` }} />
                 </div>
               </div>
             );
           })}
         </figure>
       ) : (
-        <p className="text-muted-foreground px-4 pb-4 text-sm">
+        <p className="mt-5 text-sm text-slate-500">
           Results are not published, so the answer split stays hidden.
         </p>
       )}
-    </li>
+      {question.correctPercent !== null ? (
+        <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {question.correctPercent}% correct answers
+        </p>
+      ) : null}
+    </div>
   );
 }
