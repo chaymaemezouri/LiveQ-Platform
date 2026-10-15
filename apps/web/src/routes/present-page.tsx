@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import { CountdownRing } from '@/components/countdown-ring';
+import logoUrl from '@/assets/liveq-logo.png';
 import { fetchQuestions, fetchSession } from '@/lib/api';
 import { ApiError } from '@/lib/http';
 import { fetchLiveState, openLiveSocket, type LiveState } from '@/lib/live';
@@ -92,7 +93,7 @@ export function PresentPage() {
           {session.data?.title ?? 'LiveQ'}
         </p>
         <p className="text-xs tracking-[0.35em] text-slate-400 uppercase">
-          <img src="/liveq-logo.png" alt="LiveQ" className="h-8 w-auto" />
+          <img src={logoUrl} alt="LiveQ" className="h-8 w-auto" />
         </p>
       </header>
 

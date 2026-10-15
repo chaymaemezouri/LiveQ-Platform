@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { CountdownRing } from '@/components/countdown-ring';
 import { QrCode } from '@/components/qr-code';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,6 @@ import {
   closeVoting,
   fetchLiveState,
   launchQuestion,
-  nextQuestion,
   openLiveSocket,
   publishResults,
   type LiveState,
@@ -75,7 +75,12 @@ export function LiveDesk({
     };
     socket.on('connect', () => setConnected(true));
     socket.on('disconnect', () => setConnected(false));
-    socket.on('live:state', remember);
+    socket.on('live:state', (next: LiveState) => {
+      remember(next);
+      if (next.phase === 'published') {
+        void queryClient.invalidateQueries({ queryKey: ['report', sessionId] });
+      }
+    });
     socket.on('live:votes', (payload: { voteCount: number }) => {
       queryClient.setQueryData<LiveState>(['live', sessionId], (current) =>
         current ? { ...current, voteCount: payload.voteCount } : current,
@@ -131,8 +136,11 @@ export function LiveDesk({
       setError('Use a time from 5 to 600 seconds, or leave it empty.');
       return;
     }
+    postPresentView(sessionId, 'question');
     run.mutate(() => launchQuestion(sessionId, questionId, timer));
   }
+
+  const revealed = useRef<string | null>(null);
 
   const state = live.data;
   const ordered = [...(questions.data ?? [])].sort((left, right) => left.position - right.position);
@@ -147,15 +155,43 @@ export function LiveDesk({
   const canOpen =
     sessionStatus === 'ACTIVE' && (state?.phase === 'idle' || state?.phase === 'published');
   const upcoming = ordered.filter((question) => !asked.has(question.id));
-  const hasLater = upcoming.some(
-    (question) => state?.question != null && question.position > state.question.position,
-  );
+  const selectedUpcoming = viewing && !asked.has(viewing.id) ? viewing : null;
+  const laterUpcoming =
+    upcoming.find(
+      (question) => state?.question == null || question.position > state.question.position,
+    ) ?? null;
   const remaining = state?.phase === 'open' ? remainingSeconds(state.closesAt, now) : null;
   const responded =
     participantCount === 0
       ? 0
       : Math.min(100, Math.round(((state?.voteCount ?? 0) / participantCount) * 100));
   const total = ordered.length;
+  const liveKey = `${currentId ?? ''}:${state?.phase ?? ''}`;
+
+  useEffect(() => {
+    if (state?.phase !== 'published' || !currentId || revealed.current === liveKey) {
+      revealed.current = liveKey;
+      return;
+    }
+    revealed.current = liveKey;
+    setSelectedId(currentId);
+    setShowResults(true);
+  }, [currentId, liveKey, state?.phase]);
+
+  useEffect(() => {
+    if (!viewingId) {
+      return;
+    }
+    const node = document.getElementById(`studio-question-${viewingId}`);
+    const list = node?.closest('ul');
+    if (!node || !(list instanceof HTMLElement)) {
+      return;
+    }
+    const top = node.getBoundingClientRect().top - list.getBoundingClientRect().top;
+    if (top < 0 || top + node.getBoundingClientRect().height > list.clientHeight) {
+      list.scrollTop += top - 8;
+    }
+  }, [viewingId]);
 
   return (
     <section className="text-slate-900">
@@ -191,7 +227,7 @@ export function LiveDesk({
                 : '—'
           }
         />
-        <Metric label="Timer" value={remaining === null ? '—' : formatClock(remaining)} />
+        <Metric label="Timer" value={remaining === null ? '—' : formatClock(remaining)} live={remaining !== null} />
       </div>
 
       {error ? (
@@ -213,7 +249,7 @@ export function LiveDesk({
           ) : ordered.length === 0 ? (
             <p className="mt-3 text-sm text-slate-500">Add a question before the room opens.</p>
           ) : (
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-3 max-h-80 space-y-2 overflow-y-auto pr-1">
               {ordered.map((question) => {
                 const tone = questionTone(question, currentId, state?.phase, asked);
                 const selected = question.id === viewingId;
@@ -221,6 +257,7 @@ export function LiveDesk({
                   <li key={question.id}>
                     <button
                       type="button"
+                      id={`studio-question-${question.id}`}
                       onClick={() => {
                         setSelectedId(question.id);
                         setShowResults(asked.has(question.id));
@@ -333,6 +370,15 @@ export function LiveDesk({
                   ))}
                 </ol>
               )}
+              {viewingCurrent && state?.phase === 'open' && state.closesAt && state.timerSeconds ? (
+                <div className="mt-5 flex justify-center">
+                  <CountdownRing
+                    closesAt={state.closesAt}
+                    totalSeconds={state.timerSeconds}
+                    large
+                  />
+                </div>
+              ) : null}
               {viewingCurrent && state?.phase === 'open' ? (
                 <>
                   <p className="mt-5 text-sm text-slate-500" role="status">
@@ -356,6 +402,29 @@ export function LiveDesk({
                 >
                   Back to live question
                 </Button>
+              ) : null}
+              {sessionStatus === 'ACTIVE' ? (
+                <div className="mt-5">
+                  <Label htmlFor="question-seconds">Timer</Label>
+                  <Input
+                    id="question-seconds"
+                    className="mt-2"
+                    inputMode="numeric"
+                    value={seconds}
+                    onChange={(event) => setSeconds(event.target.value)}
+                    placeholder="Empty for no timer"
+                    disabled={viewingCurrent && state?.phase === 'open'}
+                  />
+                  <p className="mt-1 text-xs text-slate-400">
+                    Set this, then press Launch question. The countdown stays on this screen.
+                    When it ends, the results open.
+                  </p>
+                  {viewingCurrent && state?.phase === 'open' && remaining === 0 ? (
+                    <p className="mt-2 text-sm font-semibold text-blue-700" role="status">
+                      Opening results…
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
               {published ? (
                 <Button
@@ -384,30 +453,28 @@ export function LiveDesk({
                   Publish results
                 </Button>
               ) : null}
-              {sessionStatus === 'ACTIVE' && viewingCurrent && state?.phase === 'published' && hasLater ? (
+              {canOpen && selectedUpcoming ? (
                 <Button
                   className="mt-4 h-11 w-full rounded-xl"
-                  onClick={() => {
-                    const timer = readTimer();
-                    if (timer === 'invalid') {
-                      setError('Use a time from 5 to 600 seconds, or leave it empty.');
-                      return;
-                    }
-                    run.mutate(() => nextQuestion(sessionId, timer));
-                  }}
-                  disabled={run.isPending}
-                >
-                  Next question
-                </Button>
-              ) : null}
-              {canOpen && viewing && !asked.has(viewing.id) ? (
-                <Button
-                  className="mt-4 h-11 w-full rounded-xl"
-                  onClick={() => launch(viewing.id)}
+                  onClick={() => launch(selectedUpcoming.id)}
                   disabled={run.isPending}
                 >
                   Launch question
                 </Button>
+              ) : null}
+              {canOpen && !selectedUpcoming && laterUpcoming ? (
+                <Button
+                  className="mt-4 h-11 w-full rounded-xl"
+                  onClick={() => launch(laterUpcoming.id)}
+                  disabled={run.isPending}
+                >
+                  Launch question {String(laterUpcoming.position).padStart(2, '0')}
+                </Button>
+              ) : null}
+              {sessionStatus === 'ACTIVE' && canOpen && !selectedUpcoming && !laterUpcoming ? (
+                <p className="mt-4 text-sm text-slate-500">
+                  These questions were already asked. Add a question, then press Launch question.
+                </p>
               ) : null}
             </>
           )}
@@ -415,6 +482,15 @@ export function LiveDesk({
 
         <aside className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-semibold">Live controls</h3>
+          {state?.phase === 'open' && state.closesAt && state.timerSeconds ? (
+            <div className="mt-4">
+              <CountdownRing closesAt={state.closesAt} totalSeconds={state.timerSeconds} />
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-slate-400">
+              The countdown appears here when you launch a question.
+            </p>
+          )}
           <div className="mt-3 rounded-2xl bg-blue-50 px-3 py-2">
             <p className="text-xs text-slate-500">Join code</p>
             <p className="mt-1 font-serif text-base tracking-[0.12em] text-blue-700">{joinCode}</p>
@@ -438,22 +514,16 @@ export function LiveDesk({
             <Button
               variant="outline"
               className="w-full"
-              onClick={() => postPresentView(sessionId, 'question')}
+              onClick={() => {
+                if (canOpen && viewing && !asked.has(viewing.id)) {
+                  launch(viewing.id);
+                  return;
+                }
+                postPresentView(sessionId, 'question');
+              }}
             >
               Show question
             </Button>
-          </div>
-          <div className="mt-4">
-            <Label htmlFor="question-seconds">Timer settings</Label>
-            <Input
-              id="question-seconds"
-              className="mt-2"
-              inputMode="numeric"
-              value={seconds}
-              onChange={(event) => setSeconds(event.target.value)}
-              placeholder="Empty for no timer"
-            />
-            <p className="mt-1 text-xs text-slate-400">5 to 600 seconds. Empty means no countdown.</p>
           </div>
         </aside>
       </div>
@@ -540,10 +610,12 @@ function PublishedAnswers({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, live = false }: { label: string; value: string; live?: boolean }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
-      <p className="text-lg font-semibold tracking-tight">{value}</p>
+      <p className={`font-semibold tracking-tight ${live ? 'text-2xl text-blue-700' : 'text-lg'}`}>
+        {value}
+      </p>
       <p className="mt-0.5 text-xs text-slate-500">{label}</p>
     </div>
   );

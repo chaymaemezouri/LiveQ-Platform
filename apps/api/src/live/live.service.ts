@@ -517,7 +517,12 @@ export class LiveService implements OnModuleInit {
   private async closeIfDue(sessionId: string): Promise<boolean> {
     const updated = await this.prisma.questionRun.updateMany({
       where: { sessionId, status: 'OPEN', closesAt: { lte: new Date() } },
-      data: { status: 'CLOSED', openSessionId: null, closedAt: new Date() },
+      data: {
+        status: 'CLOSED',
+        openSessionId: null,
+        closedAt: new Date(),
+        resultsPublishedAt: new Date(),
+      },
     });
     if (updated.count === 1) {
       this.clearTimer(sessionId);
