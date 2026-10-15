@@ -54,16 +54,15 @@ export function QuestionList({ sessionId }: { sessionId: string }) {
   }
 
   return (
-    <section className="mt-12">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl">Questions</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Prepare the order before the room opens. Correct answers stay with this
-            speaker account.
+          <h2 className="text-sm font-semibold">Questions</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Prepare the order before the room opens. Correct answers stay with this speaker account.
           </p>
         </div>
-        <Button asChild>
+        <Button size="sm" asChild>
           <Link to={`/app/sessions/${sessionId}/questions/new`}>Add question</Link>
         </Button>
       </div>
@@ -90,7 +89,7 @@ export function QuestionList({ sessionId }: { sessionId: string }) {
       ) : null}
       {questions.data?.length === 0 ? (
         <div className="border-border mt-6 rounded-xl border border-dashed px-6 py-12 text-center">
-          <h3 className="text-xl">No questions yet</h3>
+          <h3 className="text-sm font-semibold">No questions yet</h3>
           <p className="text-muted-foreground mt-2 text-sm">
             Add a graded question or an opinion poll.
           </p>
@@ -106,7 +105,7 @@ export function QuestionList({ sessionId }: { sessionId: string }) {
           {questions.data.map((question, index) => (
             <li
               key={question.id}
-              className="border-border bg-card rounded-xl border px-4 py-4 shadow-sm"
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -119,7 +118,7 @@ export function QuestionList({ sessionId }: { sessionId: string }) {
                         : ' · Opinion poll'}
                     {question.hasVotingHistory ? ' · Has votes' : ''}
                   </p>
-                  <h3 className="mt-1 text-lg">{question.prompt}</h3>
+                  <h3 className="mt-1 text-sm font-medium">{question.prompt}</h3>
                   <p className="text-muted-foreground mt-1 text-sm">
                     {question.kind === 'TEXT'
                       ? 'Participants type an answer'
