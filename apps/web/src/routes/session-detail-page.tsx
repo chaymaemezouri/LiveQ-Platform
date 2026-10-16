@@ -2,11 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { LiveDesk } from '@/components/live-desk';
+import { QuestionImportButton } from '@/components/question-import-dialog';
 import { QuestionList } from '@/components/question-list';
 import { Button } from '@/components/ui/button';
 import {
   activateSession,
   deleteSession,
+  duplicateSession,
   endSession,
   fetchSession,
   type Session,
@@ -50,6 +52,15 @@ export function SessionDetailPage() {
       remember(next);
       setError('');
       setMessage('The session has ended.');
+    },
+    onError: (caught) => setError(messageFrom(caught)),
+  });
+
+  const duplicate = useMutation({
+    mutationFn: () => duplicateSession(id),
+    onSuccess: async (next) => {
+      await queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      await navigate(`/app/sessions/${next.id}`);
     },
     onError: (caught) => setError(messageFrom(caught)),
   });
@@ -111,6 +122,18 @@ export function SessionDetailPage() {
                 <Button size="sm" variant="outline" asChild>
                   <Link to={`/app/sessions/${session.data.id}/questions/new`}>Add question</Link>
                 </Button>
+                <QuestionImportButton
+                  sessionId={session.data.id}
+                  disabled={session.data.status === 'ENDED'}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => duplicate.mutate()}
+                  disabled={duplicate.isPending}
+                >
+                  {duplicate.isPending ? 'Duplicating…' : 'Duplicate'}
+                </Button>
                 {session.data.status !== 'ENDED' ? (
                   <Button size="sm" variant="outline" asChild>
                     <Link to={`/app/sessions/${session.data.id}/edit`}>Edit</Link>
@@ -148,7 +171,7 @@ export function SessionDetailPage() {
               </>
             }
           />
-          <QuestionList sessionId={session.data.id} />
+          <QuestionList sessionId={session.data.id} canImport={session.data.status !== 'ENDED'} />
         </>
       ) : null}
     </main>

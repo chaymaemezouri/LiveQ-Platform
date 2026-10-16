@@ -524,6 +524,13 @@ export function LiveDesk({
             >
               Show question
             </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => postPresentView(sessionId, 'report')}
+            >
+              Show session report
+            </Button>
           </div>
         </aside>
       </div>

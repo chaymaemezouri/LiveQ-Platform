@@ -1,4 +1,5 @@
-import { request } from '@/lib/http';
+import { request, requestBlob } from '@/lib/http';
+import type { ImportDraft, QuestionImportPreview } from '@/lib/question-import';
 
 export interface HealthReport {
   status: 'ok';
@@ -89,6 +90,10 @@ export function createSession(input: SessionInput): Promise<Session> {
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+export function duplicateSession(id: string): Promise<Session> {
+  return request<Session>(`/api/sessions/${id}/duplicate`, { method: 'POST' });
 }
 
 export function updateSession(id: string, input: SessionInput): Promise<Session> {
@@ -183,3 +188,32 @@ export function reorderQuestions(
     body: JSON.stringify({ questionIds }),
   });
 }
+
+export function downloadQuestionTemplate(sessionId: string): Promise<{ blob: Blob; filename: string }> {
+  return requestBlob(`/api/sessions/${sessionId}/questions/import/template`);
+}
+
+export function previewQuestionImport(
+  sessionId: string,
+  file: File,
+): Promise<QuestionImportPreview> {
+  const body = new FormData();
+  body.set('file', file);
+  return request<QuestionImportPreview>(`/api/sessions/${sessionId}/questions/import/preview`, {
+    method: 'POST',
+    body,
+  });
+}
+
+export function importQuestions(
+  sessionId: string,
+  requestId: string,
+  questions: Array<QuestionInput & { row: number }>,
+): Promise<Question[]> {
+  return request<Question[]>(`/api/sessions/${sessionId}/questions/import`, {
+    method: 'POST',
+    body: JSON.stringify({ requestId, questions }),
+  });
+}
+
+export type { ImportDraft };

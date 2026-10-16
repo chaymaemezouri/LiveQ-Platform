@@ -83,6 +83,94 @@ export class SessionsService {
     throw new ConflictException('A participation code could not be reserved.');
   }
 
+  async duplicate(ownerId: string, sessionId: string): Promise<SessionView> {
+    const source = await this.prisma.session.findFirst({
+      where: { id: sessionId, ownerId },
+      select: {
+        title: true,
+        description: true,
+        questions: {
+          orderBy: { position: 'asc' },
+          select: {
+            prompt: true,
+            kind: true,
+            position: true,
+            options: {
+              orderBy: { position: 'asc' },
+              select: { id: true, label: true, position: true },
+            },
+            correctAnswer: { select: { optionId: true } },
+          },
+        },
+      },
+    });
+    if (!source) {
+      throw new NotFoundException('Session not found.');
+    }
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        const createdId = await this.prisma.$transaction(async (tx) => {
+          const session = await tx.session.create({
+            data: {
+              ownerId,
+              title: copyTitle(source.title),
+              description: source.description,
+              joinCode: createJoinCode(),
+            },
+            select: { id: true },
+          });
+          for (const question of source.questions) {
+            const created = await tx.question.create({
+              data: {
+                sessionId: session.id,
+                prompt: question.prompt,
+                kind: question.kind,
+                position: question.position,
+              },
+              select: { id: true },
+            });
+            if (question.kind === 'TEXT') {
+              continue;
+            }
+            const optionIds: string[] = [];
+            for (const option of question.options) {
+              const createdOption = await tx.questionOption.create({
+                data: {
+                  questionId: created.id,
+                  label: option.label,
+                  position: option.position,
+                },
+                select: { id: true },
+              });
+              optionIds.push(createdOption.id);
+            }
+            const correctIndex = question.correctAnswer
+              ? question.options.findIndex(
+                  (option) => option.id === question.correctAnswer?.optionId,
+                )
+              : -1;
+            const correctOptionId = correctIndex >= 0 ? optionIds[correctIndex] : undefined;
+            if (correctOptionId) {
+              await tx.correctAnswer.create({
+                data: { questionId: created.id, optionId: correctOptionId },
+              });
+            }
+          }
+          return session.id;
+        });
+        return this.get(ownerId, createdId);
+      } catch (error) {
+        if (this.isJoinCodeConflict(error) && attempt < 4) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new ConflictException('A participation code could not be reserved.');
+  }
+
   async update(
     ownerId: string,
     sessionId: string,
@@ -223,4 +311,11 @@ export class SessionsService {
       error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
     );
   }
+}
+
+function copyTitle(title: string): string {
+  const suffix = ' (copy)';
+  const room = 160 - suffix.length;
+  const base = title.length <= room ? title : title.slice(0, room).trimEnd();
+  return `${base}${suffix}`;
 }

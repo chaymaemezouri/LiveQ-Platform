@@ -32,6 +32,14 @@ export class SessionsController {
     return this.sessionsService.create(user.id, dto);
   }
 
+  @Post(':id/duplicate')
+  duplicate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.sessionsService.duplicate(user.id, id);
+  }
+
   @Get(':id')
   get(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.sessionsService.get(user.id, id);

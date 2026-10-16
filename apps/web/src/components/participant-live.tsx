@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Radio, Wifi } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNow } from '@/hooks/use-now';
+import { CountdownRing } from '@/components/countdown-ring';
 import { Textarea } from '@/components/ui/textarea';
-import { formatClock, remainingSeconds } from '@/lib/clock';
 import { ApiError } from '@/lib/http';
 import {
   castVote,
@@ -27,7 +26,6 @@ const optionStyles = [
 
 export function ParticipantLive({ code }: { code: string }) {
   const queryClient = useQueryClient();
-  const now = useNow();
   const [connected, setConnected] = useState(true);
   const [error, setError] = useState('');
   const [answer, setAnswer] = useState('');
@@ -189,6 +187,7 @@ export function ParticipantLive({ code }: { code: string }) {
         responses: state.responses ?? null,
         correctOptionId: state.correctOptionId ?? null,
         closesAt: state.closesAt,
+        timerSeconds: state.timerSeconds,
         interactive: true,
       }
     : viewing
@@ -203,6 +202,7 @@ export function ParticipantLive({ code }: { code: string }) {
           responses: viewing.responses,
           correctOptionId: viewing.correctOptionId,
           closesAt: null,
+          timerSeconds: null,
           interactive: false,
         }
       : null;
@@ -213,7 +213,6 @@ export function ParticipantLive({ code }: { code: string }) {
 
   const votingOpen =
     card.interactive && card.phase === 'open' && state.sessionStatus === 'ACTIVE';
-  const remaining = card.closesAt ? remainingSeconds(card.closesAt, now) : null;
 
   return (
     <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-4 text-slate-900 shadow-sm">
@@ -237,15 +236,15 @@ export function ParticipantLive({ code }: { code: string }) {
           </span>
           {total > 0 ? <span className="text-slate-400"> / {String(total).padStart(2, '0')}</span> : null}
         </p>
-        {card.phase === 'open' && remaining !== null ? (
-          <p className="font-medium text-orange-500" role="timer">
-            {formatClock(remaining)}
-          </p>
-        ) : (
-          <p className="text-xs font-medium tracking-wide text-slate-400 uppercase">
-            {card.phase === 'published' ? 'Results' : card.phase === 'closed' ? 'Voting closed' : 'Waiting'}
-          </p>
-        )}
+        <p className="text-xs font-medium tracking-wide text-slate-400 uppercase">
+          {card.phase === 'published'
+            ? 'Results'
+            : card.phase === 'closed'
+              ? 'Voting closed'
+              : card.phase === 'open'
+                ? 'Voting open'
+                : 'Waiting'}
+        </p>
       </div>
       {total > 0 ? (
         <div className="mt-2 flex gap-1" aria-hidden>
@@ -255,6 +254,12 @@ export function ParticipantLive({ code }: { code: string }) {
               className={`h-1.5 flex-1 rounded-full ${index < position ? 'bg-blue-600' : 'bg-slate-200'}`}
             />
           ))}
+        </div>
+      ) : null}
+
+      {card.phase === 'open' && card.closesAt && card.timerSeconds ? (
+        <div className="mt-5 flex justify-center">
+          <CountdownRing closesAt={card.closesAt} totalSeconds={card.timerSeconds} large />
         </div>
       ) : null}
 

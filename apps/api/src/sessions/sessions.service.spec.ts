@@ -31,8 +31,15 @@ describe('SessionsService', () => {
   const create = vi.fn();
   const updateMany = vi.fn();
   const deleteMany = vi.fn();
+  const questionCreate = vi.fn();
+  const optionCreate = vi.fn();
+  const correctCreate = vi.fn();
   const prisma = {
     session: { findMany, findFirst, create, updateMany, deleteMany },
+    question: { create: questionCreate },
+    questionOption: { create: optionCreate },
+    correctAnswer: { create: correctCreate },
+    $transaction: (callback: (tx: unknown) => Promise<unknown>) => callback(prisma),
   } as unknown as PrismaService;
   const config = {
     getOrThrow: () => 'http://localhost:5173/',
@@ -46,6 +53,9 @@ describe('SessionsService', () => {
     create.mockReset();
     updateMany.mockReset();
     deleteMany.mockReset();
+    questionCreate.mockReset();
+    optionCreate.mockReset();
+    correctCreate.mockReset();
   });
 
   it('creates a session for the authenticated owner and builds a public join URL', async () => {
@@ -98,6 +108,68 @@ describe('SessionsService', () => {
     await expect(service.activate(ownerId, sessionId)).rejects.toBeInstanceOf(
       ConflictException,
     );
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('copies the questions into a new empty draft', async () => {
+    findFirst
+      .mockResolvedValueOnce({
+        title: 'Morning lecture',
+        description: 'Notes',
+        questions: [
+          {
+            prompt: 'Which color?',
+            kind: 'CHOICE',
+            position: 1,
+            options: [
+              { id: 'old-a', label: 'Red', position: 1 },
+              { id: 'old-b', label: 'Blue', position: 2 },
+            ],
+            correctAnswer: { optionId: 'old-b' },
+          },
+          {
+            prompt: 'Write a word',
+            kind: 'TEXT',
+            position: 2,
+            options: [],
+            correctAnswer: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce(
+        record({ id: 'new-id', title: 'Morning lecture (copy)', joinCode: 'NEWCODE1' }),
+      );
+    create.mockResolvedValue({ id: 'new-id' });
+    questionCreate.mockResolvedValueOnce({ id: 'q1' }).mockResolvedValueOnce({ id: 'q2' });
+    optionCreate.mockResolvedValueOnce({ id: 'opt-a' }).mockResolvedValueOnce({ id: 'opt-b' });
+
+    const view = await service.duplicate(ownerId, sessionId);
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          ownerId,
+          title: 'Morning lecture (copy)',
+          description: 'Notes',
+        }),
+      }),
+    );
+    expect(create.mock.calls[0]?.[0].data).not.toHaveProperty('startedAt');
+    expect(questionCreate).toHaveBeenNthCalledWith(1, {
+      data: {
+        sessionId: 'new-id',
+        prompt: 'Which color?',
+        kind: 'CHOICE',
+        position: 1,
+      },
+      select: { id: true },
+    });
+    expect(correctCreate).toHaveBeenCalledWith({
+      data: { questionId: 'q1', optionId: 'opt-b' },
+    });
+    expect(optionCreate).toHaveBeenCalledTimes(2);
+    expect(view.id).toBe('new-id');
+    expect(view.title).toBe('Morning lecture (copy)');
     expect(updateMany).not.toHaveBeenCalled();
   });
 });

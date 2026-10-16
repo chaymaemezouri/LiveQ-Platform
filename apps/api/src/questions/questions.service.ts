@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import type { ImportQuestionItemDto } from './dto/import-questions.dto';
 import type { QuestionContentDto } from './dto/question-content.dto';
 import {
   presentQuestion,
@@ -24,6 +25,9 @@ const lockedMessage = 'This question already has votes and cannot be changed.';
 
 @Injectable()
 export class QuestionsService {
+  private readonly runningImports = new Set<string>();
+  private readonly completedImports = new Map<string, QuestionView[]>();
+
   constructor(private readonly prisma: PrismaService) {}
 
   async list(ownerId: string, sessionId: string): Promise<QuestionView[]> {
@@ -159,6 +163,53 @@ export class QuestionsService {
     });
   }
 
+  async getImportAccess(ownerId: string, sessionId: string): Promise<void> {
+    await this.requireMutableSession(this.prisma, ownerId, sessionId);
+  }
+
+  async importQuestions(
+    ownerId: string,
+    sessionId: string,
+    requestId: string,
+    questions: ImportQuestionItemDto[],
+  ): Promise<QuestionView[]> {
+    const cached = this.completedImports.get(this.importKey(sessionId, requestId));
+    if (cached) {
+      return cached;
+    }
+    if (this.runningImports.has(sessionId)) {
+      throw new ConflictException('An import is already running for this session.');
+    }
+
+    for (const question of questions) {
+      question.prompt = question.prompt.trim();
+      question.options = question.options?.map((option) => ({
+        label: option.label.trim(),
+      }));
+    }
+    const errors = questions.flatMap((question) => this.importError(question));
+    if (errors.length > 0) {
+      throw new BadRequestException(errors);
+    }
+
+    this.runningImports.add(sessionId);
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        await this.requireMutableSession(tx, ownerId, sessionId);
+        const saved: QuestionView[] = [];
+        for (const question of questions) {
+          const content = this.assertContent(question);
+          saved.push(await this.insert(tx, ownerId, sessionId, question, content));
+        }
+        return saved;
+      });
+      this.completedImports.set(this.importKey(sessionId, requestId), created);
+      return created;
+    } finally {
+      this.runningImports.delete(sessionId);
+    }
+  }
+
   private async insert(
     tx: Prisma.TransactionClient,
     ownerId: string,
@@ -262,6 +313,52 @@ export class QuestionsService {
     });
     if (!session) {
       throw new NotFoundException('Session not found.');
+    }
+  }
+
+  private async requireMutableSession(
+    db: QuestionDb,
+    ownerId: string,
+    sessionId: string,
+  ): Promise<void> {
+    const session = await db.session.findFirst({
+      where: { id: sessionId, ownerId },
+      select: { id: true, status: true },
+    });
+    if (!session) {
+      throw new NotFoundException('Session not found.');
+    }
+    if (session.status === 'ENDED') {
+      throw new ConflictException('Ended sessions cannot be edited.');
+    }
+  }
+
+  private importKey(sessionId: string, requestId: string): string {
+    return `${sessionId}:${requestId}`;
+  }
+
+  private importError(question: ImportQuestionItemDto): string[] {
+    if (!question.prompt.trim()) {
+      return [`Row ${question.row}: Question text is required.`];
+    }
+    try {
+      this.assertContent(question);
+      return [];
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        const response = error.getResponse();
+        const message =
+          typeof response === 'string'
+            ? response
+            : typeof response === 'object' &&
+                response &&
+                'message' in response &&
+                typeof response.message === 'string'
+              ? response.message
+              : 'This question is not valid.';
+        return [`Row ${question.row}: ${message}`];
+      }
+      throw error;
     }
   }
 

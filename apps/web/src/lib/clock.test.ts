@@ -8,6 +8,7 @@ describe('countdown clock', () => {
     expect(remainingSeconds(closesAt, now)).toBe(30);
     expect(remainingSeconds(closesAt, now + 30_000)).toBe(0);
     expect(remainingSeconds(null, now)).toBeNull();
-    expect(formatClock(75)).toBe('1:15');
+    expect(formatClock(75)).toBe('01:15');
+    expect(formatClock(30)).toBe('00:30');
   });
 });

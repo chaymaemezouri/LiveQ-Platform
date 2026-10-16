@@ -43,7 +43,7 @@ export function CountdownRing({
             transform="rotate(-90 50 50)"
           />
         </svg>
-        <p className="font-serif text-3xl sm:text-4xl">{formatClock(left)}</p>
+        <p className="font-mono text-4xl tracking-wider tabular-nums sm:text-5xl">{formatClock(left)}</p>
       </div>
       <p className="text-muted-foreground mt-3 text-xs tracking-[0.2em] uppercase">
         {left === 0 ? 'Time is up' : 'Time left'}

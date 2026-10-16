@@ -68,7 +68,7 @@ async function send<T>(
   useSpeakerToken: boolean,
 ): Promise<T> {
   const headers = new Headers(init?.headers);
-  if (init?.body) {
+  if (init?.body && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
   if (useSpeakerToken) {

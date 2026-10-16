@@ -3,10 +3,17 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
+import { QuestionImportButton } from '@/components/question-import-dialog';
 import { deleteQuestion, fetchQuestions, reorderQuestions } from '@/lib/api';
 import { ApiError } from '@/lib/http';
 
-export function QuestionList({ sessionId }: { sessionId: string }) {
+export function QuestionList({
+  sessionId,
+  canImport = true,
+}: {
+  sessionId: string;
+  canImport?: boolean;
+}) {
   const queryClient = useQueryClient();
   const questions = useQuery({
     queryKey: ['questions', sessionId],
@@ -62,9 +69,12 @@ export function QuestionList({ sessionId }: { sessionId: string }) {
             Prepare the order before the room opens. Correct answers stay with this speaker account.
           </p>
         </div>
-        <Button size="sm" asChild>
-          <Link to={`/app/sessions/${sessionId}/questions/new`}>Add question</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" asChild>
+            <Link to={`/app/sessions/${sessionId}/questions/new`}>Add question</Link>
+          </Button>
+          <QuestionImportButton sessionId={sessionId} disabled={!canImport} />
+        </div>
       </div>
 
       {message ? (

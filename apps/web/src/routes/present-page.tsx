@@ -2,11 +2,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import { CountdownRing } from '@/components/countdown-ring';
+import { ReportDashboard } from '@/components/report-dashboard';
 import logoUrl from '@/assets/liveq-logo.png';
 import { fetchQuestions, fetchSession } from '@/lib/api';
 import { ApiError } from '@/lib/http';
 import { fetchLiveState, openLiveSocket, type LiveState } from '@/lib/live';
 import { presentChannelName, type PresentView } from '@/lib/present-channel';
+import { fetchReport } from '@/lib/reports';
 
 export function PresentPage() {
   const { sessionId = '' } = useParams();
@@ -24,6 +26,11 @@ export function PresentPage() {
     queryKey: ['live', sessionId],
     queryFn: () => fetchLiveState(sessionId),
     enabled: session.data?.status !== 'DRAFT',
+  });
+  const report = useQuery({
+    queryKey: ['report', sessionId],
+    queryFn: () => fetchReport(sessionId),
+    enabled: session.data?.status !== 'DRAFT' && pinned === 'report',
   });
 
   useEffect(() => {
@@ -54,7 +61,7 @@ export function PresentPage() {
     }
     const channel = new BroadcastChannel(presentChannelName(sessionId));
     channel.onmessage = (event: MessageEvent<{ view?: PresentView }>) => {
-      if (event.data.view === 'code' || event.data.view === 'question') {
+      if (event.data.view === 'code' || event.data.view === 'question' || event.data.view === 'report') {
         setPinned(event.data.view);
       }
     };
@@ -62,9 +69,11 @@ export function PresentPage() {
   }, [sessionId]);
 
   const state = live.data;
+  const showReport = pinned === 'report';
   const showQuestion =
-    pinned === 'question' ||
-    (pinned !== 'code' && state?.question != null && state.phase !== 'idle');
+    !showReport &&
+    (pinned === 'question' ||
+      (pinned !== 'code' && state?.question != null && state.phase !== 'idle'));
 
   const total = questions.data?.length ?? 0;
   const position = state?.question?.position ?? 0;
@@ -105,7 +114,23 @@ export function PresentPage() {
         </p>
       ) : null}
 
-      {session.data && !showQuestion ? (
+      {session.data && showReport ? (
+        <section className="relative mx-auto w-full max-w-5xl flex-1 py-8">
+          <p className="text-sm tracking-[0.22em] text-slate-400 uppercase">Session report</p>
+          <h1 className="mt-3 font-serif text-4xl sm:text-5xl">{session.data.title}</h1>
+          {report.isPending ? (
+            <p className="mt-8 text-slate-500">Loading the session report…</p>
+          ) : report.data ? (
+            <div className="mt-8">
+              <ReportDashboard report={report.data} />
+            </div>
+          ) : (
+            <p className="mt-8 text-slate-500">The session report could not be opened.</p>
+          )}
+        </section>
+      ) : null}
+
+      {session.data && !showQuestion && !showReport ? (
         <section className="flex flex-1 flex-col items-center justify-center text-center">
           <p className="text-muted-foreground text-sm tracking-[0.28em] uppercase">
             Join with this code
@@ -143,7 +168,7 @@ export function PresentPage() {
                 </p>
               ) : null}
             </div>
-            {state.closesAt && state.timerSeconds ? (
+            {state.phase === 'open' && state.closesAt && state.timerSeconds ? (
               <CountdownRing closesAt={state.closesAt} totalSeconds={state.timerSeconds} large />
             ) : null}
           </div>
@@ -168,6 +193,33 @@ export function PresentPage() {
                 </p>
               )}
             </div>
+          ) : state.phase === 'published' && state.results ? (
+            <figure aria-label="Results" className="mt-10 space-y-5">
+              {state.results.map((result, index) => {
+                const correct = result.optionId === state.correctOptionId;
+                const tone = correct ? 'bg-emerald-500' : (tones[index % tones.length] ?? 'bg-blue-500');
+                return (
+                  <div key={result.optionId}>
+                    <div className="mb-2 flex items-center justify-between gap-3 text-xl">
+                      <span>
+                        {String.fromCharCode(65 + index)} {result.label}
+                        {correct ? (
+                          <span className="ml-3 text-sm font-semibold tracking-wide text-emerald-700 uppercase">
+                            Correct
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="text-slate-500">
+                        {result.percent}% · {result.count}
+                      </span>
+                    </div>
+                    <div className="h-3 overflow-hidden rounded-full bg-white/80">
+                      <div className={`h-full rounded-full ${tone}`} style={{ width: `${result.percent}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </figure>
           ) : (
           <ul className="mt-10 grid gap-4 sm:grid-cols-2">
             {state.question.options.map((option, index) => {

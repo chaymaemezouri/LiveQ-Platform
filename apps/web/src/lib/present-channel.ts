@@ -1,4 +1,4 @@
-export type PresentView = 'code' | 'question';
+export type PresentView = 'code' | 'question' | 'report';
 
 export function postPresentView(sessionId: string, view: PresentView): void {
   if (typeof BroadcastChannel === 'undefined') {
