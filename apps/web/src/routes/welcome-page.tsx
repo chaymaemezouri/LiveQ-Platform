@@ -40,9 +40,6 @@ export function WelcomePage() {
           <Button variant="outline" asChild>
             <Link to="/join">Join with a code</Link>
           </Button>
-          <Button variant="outline" asChild>
-            <Link to="/status">Platform status</Link>
-          </Button>
         </div>
       </main>
     </div>
