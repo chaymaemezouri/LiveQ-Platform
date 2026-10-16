@@ -7,17 +7,26 @@ import logoUrl from '@/assets/liveq-logo.png';
 import { fetchQuestions, fetchSession } from '@/lib/api';
 import { ApiError } from '@/lib/http';
 import { fetchLiveState, openLiveSocket, type LiveState } from '@/lib/live';
-import { presentChannelName, type PresentView } from '@/lib/present-channel';
+import {
+  isPresentView,
+  presentChannelName,
+  readPresentView,
+  type PresentMessage,
+  type PresentView,
+} from '@/lib/present-channel';
 import { fetchReport } from '@/lib/reports';
 
 export function PresentPage() {
   const { sessionId = '' } = useParams();
   const queryClient = useQueryClient();
-  const [pinned, setPinned] = useState<PresentView | null>(null);
+  const [pinned, setPinned] = useState<PresentView | null>(() => readPresentView(sessionId));
   const session = useQuery({
     queryKey: ['session', sessionId],
     queryFn: () => fetchSession(sessionId),
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
   });
+  const sessionStatus = session.data?.status;
   const questions = useQuery({
     queryKey: ['questions', sessionId],
     queryFn: () => fetchQuestions(sessionId),
@@ -25,16 +34,20 @@ export function PresentPage() {
   const live = useQuery({
     queryKey: ['live', sessionId],
     queryFn: () => fetchLiveState(sessionId),
-    enabled: session.data?.status !== 'DRAFT',
+    enabled: Boolean(session.data) && session.data?.status !== 'DRAFT',
+    refetchInterval: 2000,
+    refetchIntervalInBackground: true,
   });
   const report = useQuery({
     queryKey: ['report', sessionId],
     queryFn: () => fetchReport(sessionId),
-    enabled: session.data?.status !== 'DRAFT' && pinned === 'report',
+    enabled: Boolean(session.data) && session.data?.status !== 'DRAFT' && pinned === 'report',
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
   });
 
   useEffect(() => {
-    if (session.data?.status === 'DRAFT') {
+    if (!sessionStatus || sessionStatus === 'DRAFT') {
       return;
     }
     const token = localStorage.getItem('liveq.accessToken');
@@ -44,6 +57,9 @@ export function PresentPage() {
     const socket = openLiveSocket({ role: 'speaker', token, sessionId });
     socket.on('live:state', (state: LiveState) => {
       queryClient.setQueryData(['live', sessionId], state);
+      if (state.phase === 'published') {
+        void queryClient.invalidateQueries({ queryKey: ['report', sessionId] });
+      }
     });
     socket.on('live:votes', (payload: { voteCount: number }) => {
       queryClient.setQueryData<LiveState>(['live', sessionId], (current) =>
@@ -53,20 +69,41 @@ export function PresentPage() {
     return () => {
       socket.disconnect();
     };
-  }, [queryClient, session.data?.status, sessionId]);
+  }, [queryClient, sessionStatus, sessionId]);
 
   useEffect(() => {
-    if (typeof BroadcastChannel === 'undefined') {
-      return;
-    }
-    const channel = new BroadcastChannel(presentChannelName(sessionId));
-    channel.onmessage = (event: MessageEvent<{ view?: PresentView }>) => {
-      if (event.data.view === 'code' || event.data.view === 'question' || event.data.view === 'report') {
-        setPinned(event.data.view);
+    function refresh(view: PresentView, state?: LiveState) {
+      setPinned(view);
+      if (state) {
+        queryClient.setQueryData(['live', sessionId], state);
+      } else {
+        void queryClient.invalidateQueries({ queryKey: ['live', sessionId] });
       }
+      void queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
+      void queryClient.invalidateQueries({ queryKey: ['questions', sessionId] });
+      void queryClient.invalidateQueries({ queryKey: ['report', sessionId] });
+    }
+    function onStorage(event: StorageEvent) {
+      if (event.key === presentChannelName(sessionId) && isPresentView(event.newValue)) {
+        refresh(event.newValue);
+      }
+    }
+    window.addEventListener('storage', onStorage);
+    const channel = typeof BroadcastChannel !== 'undefined'
+      ? new BroadcastChannel(presentChannelName(sessionId))
+      : null;
+    if (channel) {
+      channel.onmessage = (event: MessageEvent<PresentMessage>) => {
+        if (isPresentView(event.data?.view)) {
+          refresh(event.data.view, event.data.state);
+        }
+      };
+    }
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      channel?.close();
     };
-    return () => channel.close();
-  }, [sessionId]);
+  }, [queryClient, sessionId]);
 
   const state = live.data;
   const showReport = pinned === 'report';
@@ -259,8 +296,12 @@ export function PresentPage() {
 
       {session.data && showQuestion && !state?.question ? (
         <section className="flex flex-1 items-center justify-center">
-          <p className="text-muted-foreground text-2xl">
-            The next question will appear here.
+          <p className="text-muted-foreground text-2xl" role={live.isError ? 'alert' : 'status'}>
+            {live.isError
+              ? 'The live question could not be loaded. Retrying…'
+              : live.isFetching
+                ? 'Loading the live question…'
+                : 'Launch a question from Live controls to display it here.'}
           </p>
         </section>
       ) : null}

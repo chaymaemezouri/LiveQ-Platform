@@ -111,6 +111,7 @@ export function LiveDesk({
       queryClient.setQueryData(['live', sessionId], state);
       setSelectedId(state.question?.questionId ?? null);
       setShowResults(state.phase === 'published');
+      postPresentView(sessionId, 'question', state);
       setError('');
       void queryClient.invalidateQueries({ queryKey: ['questions', sessionId] });
       void queryClient.invalidateQueries({ queryKey: ['report', sessionId] });
@@ -136,7 +137,6 @@ export function LiveDesk({
       setError('Use a time from 5 to 600 seconds, or leave it empty.');
       return;
     }
-    postPresentView(sessionId, 'question');
     run.mutate(() => launchQuestion(sessionId, questionId, timer));
   }
 
@@ -370,15 +370,6 @@ export function LiveDesk({
                   ))}
                 </ol>
               )}
-              {viewingCurrent && state?.phase === 'open' && state.closesAt && state.timerSeconds ? (
-                <div className="mt-5 flex justify-center">
-                  <CountdownRing
-                    closesAt={state.closesAt}
-                    totalSeconds={state.timerSeconds}
-                    large
-                  />
-                </div>
-              ) : null}
               {viewingCurrent && state?.phase === 'open' ? (
                 <>
                   <p className="mt-5 text-sm text-slate-500" role="status">
@@ -416,12 +407,12 @@ export function LiveDesk({
                     disabled={viewingCurrent && state?.phase === 'open'}
                   />
                   <p className="mt-1 text-xs text-slate-400">
-                    Set this, then press Launch question. The countdown stays on this screen.
-                    When it ends, the results open.
+                    Set this, then press Launch question. The countdown appears in Live controls.
+                    When it ends, voting closes. Press Publish results when ready.
                   </p>
                   {viewingCurrent && state?.phase === 'open' && remaining === 0 ? (
                     <p className="mt-2 text-sm font-semibold text-blue-700" role="status">
-                      Opening results…
+                      Closing voting…
                     </p>
                   ) : null}
                 </div>
