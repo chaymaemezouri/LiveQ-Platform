@@ -79,7 +79,6 @@ describe('Projector countdown (e2e)', () => {
       .send({ questionId: graded.body.id, timerSeconds: 4 })
       .expect(400);
 
-    
     const opened = await request(server)
       .post(`/api/sessions/${sessionId}/live/launch`)
       .set(auth)
@@ -96,7 +95,6 @@ describe('Projector countdown (e2e)', () => {
         expect.objectContaining({ id: four, label: '4' }),
       ]),
     );
-
 
     const prisma = app.get(PrismaService);
     await prisma.questionRun.updateMany({
@@ -117,5 +115,21 @@ describe('Projector countdown (e2e)', () => {
       .set('Authorization', `Bearer ${ada.body.accessToken}`)
       .send({ optionId: four })
       .expect(409);
+
+    const participantState = await request(server)
+      .get('/api/join/live')
+      .set('Authorization', `Bearer ${ada.body.accessToken}`)
+      .expect(200);
+    expect(participantState.body.phase).toBe('closed');
+    expect(participantState.body.results).toBeNull();
+    expect(participantState.body).not.toHaveProperty('correctOptionId');
+
+    const published = await request(server)
+      .post(`/api/sessions/${sessionId}/live/publish`)
+      .set(auth)
+      .expect(201);
+    expect(published.body.phase).toBe('published');
+    expect(published.body.correctOptionId).toBe(four);
+    expect(published.body.results).toEqual(expect.any(Array));
   });
 });

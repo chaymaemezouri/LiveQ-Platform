@@ -521,7 +521,6 @@ export class LiveService implements OnModuleInit {
         status: 'CLOSED',
         openSessionId: null,
         closedAt: new Date(),
-        resultsPublishedAt: new Date(),
       },
     });
     if (updated.count === 1) {
