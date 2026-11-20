@@ -21,6 +21,12 @@ export interface ReportQuestion {
   correctOptionId: string | null;
   options: ReportOption[];
   responses: string[];
+  answers: ReportAnswer[];
+}
+
+export interface ReportAnswer {
+  name: string;
+  answer: string;
 }
 
 export interface SessionReport {
@@ -74,5 +80,6 @@ export interface ReportSource {
   startedAt: string | null;
   endedAt: string | null;
   participantCount: number;
+  participants?: { id: string; nickname: string | null }[];
   questions: ReportQuestionSource[];
 }

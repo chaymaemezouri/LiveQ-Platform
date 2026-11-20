@@ -177,6 +177,19 @@ function QuestionDetail({ question, total }: { question: ReportQuestion; total: 
           Results are not published, so the answer split stays hidden.
         </p>
       )}
+      {question.published && (question.answers?.length ?? 0) > 0 ? (
+        <div className="mt-5">
+          <p className="text-sm font-medium">Names and answers</p>
+          <ul className="mt-2 divide-y divide-slate-100 rounded-2xl border border-slate-200">
+            {question.answers?.map((item, answerIndex) => (
+              <li key={`${question.questionId}-${answerIndex}`} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
+                <span className="font-medium">{item.name}</span>
+                <span className="text-right text-slate-600">{item.answer}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {question.correctPercent !== null ? (
         <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           {question.correctPercent}% correct answers

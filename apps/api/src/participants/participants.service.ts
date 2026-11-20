@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JoinSessionDto } from './dto/join-session.dto';
 import type { JoinResult, ParticipantPresence } from './participant.presenter';
@@ -10,7 +11,7 @@ const invalidCode = 'This joining code is not valid.';
 export class ParticipantsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async join(dto: JoinSessionDto): Promise<JoinResult> {
+  async join(dto: JoinSessionDto, ipAddress: string | null): Promise<JoinResult> {
     const session = await this.prisma.session.findUnique({
       where: { joinCode: dto.code },
       select: { id: true, title: true, status: true },
@@ -21,16 +22,37 @@ export class ParticipantsService {
     if (session.status === 'ENDED') {
       throw new ConflictException('This session has ended.');
     }
+    if (ipAddress) {
+      const existing = await this.prisma.participant.findFirst({
+        where: { sessionId: session.id, ipAddress },
+        select: { id: true },
+      });
+      if (existing) {
+        throw new ConflictException('This network already joined this session.');
+      }
+    }
 
     const accessToken = createParticipantToken();
-    const participant = await this.prisma.participant.create({
-      data: {
-        sessionId: session.id,
-        tokenHash: hashParticipantToken(accessToken),
-        nickname: dto.nickname ?? null,
-      },
-      select: { id: true, nickname: true },
-    });
+    let participant: { id: string; nickname: string | null };
+    try {
+      participant = await this.prisma.participant.create({
+        data: {
+          sessionId: session.id,
+          tokenHash: hashParticipantToken(accessToken),
+          nickname: dto.nickname ?? null,
+          ipAddress,
+        },
+        select: { id: true, nickname: true },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('This network already joined this session.');
+      }
+      throw error;
+    }
     const participantCount = await this.prisma.participant.count({
       where: { sessionId: session.id },
     });

@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
+import { clientAddress } from '../common/client-address';
 import { CurrentParticipant } from './current-participant.decorator';
 import { JoinSessionDto } from './dto/join-session.dto';
 import { ParticipantAuthGuard } from './participant-auth.guard';
@@ -10,8 +12,8 @@ export class ParticipantsController {
   constructor(private readonly participantsService: ParticipantsService) {}
 
   @Post()
-  join(@Body() dto: JoinSessionDto) {
-    return this.participantsService.join(dto);
+  join(@Body() dto: JoinSessionDto, @Req() request: Request) {
+    return this.participantsService.join(dto, clientAddress(request));
   }
 
   @Get('me')

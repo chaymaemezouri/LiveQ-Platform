@@ -22,6 +22,7 @@ export interface ReportQuestion {
   correctOptionId: string | null;
   options: ReportOption[];
   responses?: string[];
+  answers?: { name: string; answer: string }[];
 }
 
 export interface SessionReport {

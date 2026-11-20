@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { hash, verify } from '@node-rs/argon2';
 import { Prisma } from '../generated/prisma/client';
@@ -6,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUser } from './authenticated-user';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
+import type { ResetPasswordDto } from './dto/reset-password.dto';
 
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60 * 12;
 
@@ -66,6 +72,23 @@ export class AuthService {
       email: user.email,
       displayName: user.displayName,
     });
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<{ reset: true }> {
+    const email = dto.email.toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new NotFoundException('No speaker account uses this email.');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: await hash(dto.password) },
+    });
+    return { reset: true };
   }
 
   private issue(user: AuthenticatedUser): Promise<AuthResult> {

@@ -88,10 +88,13 @@ describe('Participant joining (e2e)', () => {
 
     const withName = await request(server)
       .post('/api/join')
+      .set('X-Forwarded-For', '203.0.113.10')
       .send({ code, nickname: '  Ada  ' })
       .expect(201);
     expect(withName.body.participant.nickname).toBe('Ada');
     expect(withName.body.session.participantCount).toBe(2);
+
+    await request(server).post('/api/join').send({ code, nickname: 'Grace' }).expect(409);
 
     const stored = await prisma.participant.findUnique({
       where: { id: anonymous.body.participant.id as string },

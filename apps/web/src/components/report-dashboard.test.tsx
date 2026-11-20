@@ -34,6 +34,10 @@ function report(overrides: Partial<SessionReport> = {}): SessionReport {
           { optionId: 'three', label: '3', count: 1, percent: 50 },
           { optionId: 'four', label: '4', count: 1, percent: 50 },
         ],
+        answers: [
+          { name: 'Ada', answer: 'B 4' },
+          { name: 'Grace', answer: 'A 3' },
+        ],
       },
     ],
     ...overrides,
@@ -50,6 +54,9 @@ describe('ReportDashboard', () => {
     expect(screen.getAllByText('50%').length).toBeGreaterThan(0);
     expect(screen.getByText('Correct')).toBeInTheDocument();
     expect(screen.getByRole('figure', { name: 'Results' })).toBeInTheDocument();
+    expect(screen.getByText('Names and answers')).toBeInTheDocument();
+    expect(screen.getByText('Ada')).toBeInTheDocument();
+    expect(screen.getByText('Grace')).toBeInTheDocument();
   });
 
   it('hides the answer split until results are published', () => {

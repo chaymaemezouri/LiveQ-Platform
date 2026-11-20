@@ -17,6 +17,10 @@ const reportSelect = {
   endedAt: true,
   updatedAt: true,
   _count: { select: { participants: true } },
+  participants: {
+    select: { id: true, nickname: true },
+    orderBy: { joinedAt: 'asc' },
+  },
   questions: {
     select: {
       id: true,
@@ -100,6 +104,7 @@ function toSource(session: ReportRecord): ReportSource {
     startedAt: session.startedAt?.toISOString() ?? null,
     endedAt: session.endedAt?.toISOString() ?? null,
     participantCount: session._count.participants,
+    participants: session.participants,
     questions: [...session.questions]
       .sort((left, right) => left.position - right.position)
       .map((question) => {

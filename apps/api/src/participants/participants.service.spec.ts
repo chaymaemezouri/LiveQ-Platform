@@ -9,6 +9,7 @@ describe('ParticipantsService', () => {
   const participantCreate = vi.fn();
   const participantCount = vi.fn();
   const participantFindUnique = vi.fn();
+  const participantFindFirst = vi.fn();
   const participantUpdate = vi.fn();
   const prisma = {
     session: { findUnique: sessionFindUnique },
@@ -16,6 +17,7 @@ describe('ParticipantsService', () => {
       create: participantCreate,
       count: participantCount,
       findUnique: participantFindUnique,
+      findFirst: participantFindFirst,
       update: participantUpdate,
     },
   } as unknown as PrismaService;
@@ -33,12 +35,12 @@ describe('ParticipantsService', () => {
       title: 'Hidden',
       status: 'DRAFT',
     });
-    await expect(service.join({ code: 'AB23CD45' })).rejects.toBeInstanceOf(
+    await expect(service.join({ code: 'AB23CD45' }, '203.0.113.8')).rejects.toBeInstanceOf(
       NotFoundException,
     );
 
     sessionFindUnique.mockResolvedValueOnce(null);
-    await expect(service.join({ code: 'AB23CD45' })).rejects.toBeInstanceOf(
+    await expect(service.join({ code: 'AB23CD45' }, '203.0.113.8')).rejects.toBeInstanceOf(
       NotFoundException,
     );
     expect(participantCreate).not.toHaveBeenCalled();
@@ -51,7 +53,7 @@ describe('ParticipantsService', () => {
       status: 'ENDED',
     });
 
-    await expect(service.join({ code: 'AB23CD45' })).rejects.toBeInstanceOf(
+    await expect(service.join({ code: 'AB23CD45' }, '203.0.113.8')).rejects.toBeInstanceOf(
       ConflictException,
     );
     expect(participantCreate).not.toHaveBeenCalled();
@@ -64,7 +66,7 @@ describe('ParticipantsService', () => {
       status: 'ACTIVE',
     });
 
-    const result = await service.join({ code: 'ab23cd45', nickname: null });
+    const result = await service.join({ code: 'ab23cd45', nickname: null }, '203.0.113.8');
 
     const savedHash = participantCreate.mock.calls[0]?.[0].data.tokenHash as string;
     expect(savedHash).toMatch(/^[a-f0-9]{64}$/);
@@ -77,6 +79,21 @@ describe('ParticipantsService', () => {
       participantCount: 1,
     });
     expect(result).not.toHaveProperty('tokenHash');
+    expect(participantCreate.mock.calls[0]?.[0].data.ipAddress).toBe('203.0.113.8');
+  });
+
+  it('refuses a second join from the same network', async () => {
+    sessionFindUnique.mockResolvedValue({
+      id: sessionId,
+      title: 'Opening lecture',
+      status: 'ACTIVE',
+    });
+    participantFindFirst.mockResolvedValue({ id: 'participant-1' });
+
+    await expect(service.join({ code: 'AB23CD45' }, '203.0.113.8')).rejects.toThrow(
+      'This network already joined this session.',
+    );
+    expect(participantCreate).not.toHaveBeenCalled();
   });
 
   it('reconnects the same participant and refreshes last seen', async () => {

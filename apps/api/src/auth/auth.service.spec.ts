@@ -1,6 +1,6 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { hash } from '@node-rs/argon2';
+import { hash, verify } from '@node-rs/argon2';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from './auth.service';
@@ -8,14 +8,16 @@ import { AuthService } from './auth.service';
 describe('AuthService', () => {
   const create = vi.fn();
   const findUnique = vi.fn();
+  const update = vi.fn();
   const signAsync = vi.fn().mockResolvedValue('signed-token');
-  const prisma = { user: { create, findUnique } } as unknown as PrismaService;
+  const prisma = { user: { create, findUnique, update } } as unknown as PrismaService;
   const jwtService = { signAsync } as unknown as JwtService;
   const service = new AuthService(prisma, jwtService);
 
   beforeEach(() => {
     create.mockReset();
     findUnique.mockReset();
+    update.mockReset();
     signAsync.mockClear();
   });
 
@@ -101,5 +103,32 @@ describe('AuthService', () => {
       { sub: 'user-1' },
       { expiresIn: 60 * 60 * 12 },
     );
+  });
+
+  it('replaces the password only when the email belongs to an account', async () => {
+    findUnique.mockResolvedValueOnce(null);
+    await expect(
+      service.resetPassword({
+        email: 'missing@university.edu',
+        password: 'new-password-123',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(update).not.toHaveBeenCalled();
+
+    findUnique.mockResolvedValueOnce({ id: 'user-1' });
+    update.mockResolvedValue({ id: 'user-1' });
+
+    await expect(
+      service.resetPassword({
+        email: 'Ada@University.edu',
+        password: 'new-password-123',
+      }),
+    ).resolves.toEqual({ reset: true });
+
+    const savedHash = update.mock.calls[0]?.[0].data.passwordHash as string;
+    expect(update.mock.calls[0]?.[0].where).toEqual({ id: 'user-1' });
+    expect(savedHash.startsWith('$argon2')).toBe(true);
+    expect(await verify(savedHash, 'new-password-123')).toBe(true);
+    expect(savedHash).not.toContain('new-password-123');
   });
 });

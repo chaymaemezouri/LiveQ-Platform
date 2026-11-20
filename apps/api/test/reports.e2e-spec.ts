@@ -95,6 +95,7 @@ describe('Conference reports (e2e)', () => {
       .expect(201);
     const grace = await request(server)
       .post('/api/join')
+      .set('X-Forwarded-For', '203.0.113.21')
       .send({ code: created.body.joinCode, nickname: 'Grace' })
       .expect(201);
 

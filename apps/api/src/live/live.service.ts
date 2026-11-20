@@ -296,6 +296,23 @@ export class LiveService implements OnModuleInit {
       throw new ConflictException('You already voted on this question.');
     }
 
+    const voter = await this.prisma.participant.findUnique({
+      where: { id: participantId },
+      select: { ipAddress: true },
+    });
+    if (voter?.ipAddress) {
+      const sameNetwork = await this.prisma.vote.findFirst({
+        where: {
+          questionRunId: run.id,
+          participant: { sessionId, ipAddress: voter.ipAddress },
+        },
+        select: { id: true },
+      });
+      if (sameNetwork) {
+        throw new ConflictException('This network already voted on this question.');
+      }
+    }
+
     const question = await this.prisma.question.findFirst({
       where: { id: run.questionId },
       select: { kind: true },

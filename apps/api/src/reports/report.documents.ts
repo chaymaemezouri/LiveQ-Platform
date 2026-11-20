@@ -197,6 +197,22 @@ export async function renderReportWorkbook(report: SessionReport): Promise<Buffe
     }
   }
 
+  const people = workbook.addWorksheet('Individual answers');
+  people.columns = [
+    { header: 'Question', key: 'question', width: 12 },
+    { header: 'Name', key: 'name', width: 24 },
+    { header: 'Answer', key: 'answer', width: 48 },
+  ];
+  people.getRow(1).font = { bold: true };
+  for (const question of report.questions) {
+    if (!question.published) {
+      continue;
+    }
+    for (const item of question.answers) {
+      people.addRow([question.position, item.name, item.answer]);
+    }
+  }
+
   const written = workbook.addWorksheet('Written answers');
   written.columns = [
     { header: 'Question', key: 'question', width: 12 },

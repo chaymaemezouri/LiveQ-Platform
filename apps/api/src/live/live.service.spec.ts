@@ -17,9 +17,11 @@ describe('LiveService', () => {
   const runCreate = vi.fn();
   const runUpdateMany = vi.fn();
   const voteFindFirst = vi.fn();
+  const participantFindUnique = vi.fn();
   const transaction = vi.fn();
   const prisma = {
     session: { findFirst: sessionFindFirst, findUnique: sessionFindUnique },
+    participant: { findUnique: participantFindUnique },
     question: { findFirst: questionFindFirst },
     questionRun: {
       findFirst: runFindFirst,
@@ -54,6 +56,20 @@ describe('LiveService', () => {
         optionId: '77777777-7777-4777-8777-777777777777',
       }),
     ).rejects.toThrow('You already voted on this question.');
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('refuses a vote when the same network already answered', async () => {
+    sessionFindUnique.mockResolvedValue({ status: 'ACTIVE' });
+    runFindFirst.mockResolvedValue({ id: runId, questionId });
+    voteFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'other-vote' });
+    participantFindUnique.mockResolvedValue({ ipAddress: '203.0.113.8' });
+
+    await expect(
+      service.cast(participantId, sessionId, {
+        optionId: '77777777-7777-4777-8777-777777777777',
+      }),
+    ).rejects.toThrow('This network already voted on this question.');
     expect(transaction).not.toHaveBeenCalled();
   });
 

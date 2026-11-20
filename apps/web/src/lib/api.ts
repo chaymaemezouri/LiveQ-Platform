@@ -59,6 +59,16 @@ export function registerSpeaker(input: {
   });
 }
 
+export function resetSpeakerPassword(input: {
+  email: string;
+  password: string;
+}): Promise<{ reset: true }> {
+  return request<{ reset: true }>('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 export function loginSpeaker(input: {
   email: string;
   password: string;

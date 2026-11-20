@@ -103,6 +103,11 @@ export function LoginPage() {
             </button>
           </div>
         </div>
+        <div className="text-right">
+          <Link to="/forgot-password" className="text-sm font-medium text-blue-600 hover:text-blue-700">
+            Forgot password?
+          </Link>
+        </div>
         <Button
           type="submit"
           disabled={pending}

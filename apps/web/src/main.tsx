@@ -7,6 +7,7 @@ import { DashboardShell } from '@/components/dashboard-shell';
 import { ProtectedRoute } from '@/components/protected-route';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AccountPage } from '@/routes/account-page';
+import { ForgotPasswordPage } from '@/routes/forgot-password-page';
 import { JoinPage } from '@/routes/join-page';
 import { LoginPage } from '@/routes/login-page';
 import { NotFoundPage } from '@/routes/not-found-page';
@@ -35,6 +36,7 @@ const queryClient = new QueryClient({
 const router = createBrowserRouter([
   { path: '/', Component: WelcomePage },
   { path: '/login', Component: LoginPage },
+  { path: '/forgot-password', Component: ForgotPasswordPage },
   { path: '/register', Component: RegisterPage },
   { path: '/status', Component: StatusPage },
   { path: '/join', Component: JoinPage },

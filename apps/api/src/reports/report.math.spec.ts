@@ -12,6 +12,10 @@ function source(overrides: Partial<ReportSource> = {}): ReportSource {
     startedAt: '2026-11-01T09:00:00.000Z',
     endedAt: null,
     participantCount: 2,
+    participants: [
+      { id: 'ada', nickname: 'Ada' },
+      { id: 'grace', nickname: 'Grace' },
+    ],
     questions: [
       {
         id: 'question-1',
@@ -49,6 +53,7 @@ describe('conference reports', () => {
       graded: true,
       correctOptionId: null,
       options: [],
+      answers: [],
     });
     expect(JSON.stringify(report)).not.toContain(correctOptionId);
   });
@@ -104,6 +109,10 @@ describe('conference reports', () => {
     expect(report.questions[0]?.options).toEqual([
       { optionId: otherOptionId, label: '3', count: 1, percent: 50 },
       { optionId: correctOptionId, label: '4', count: 1, percent: 50 },
+    ]);
+    expect(report.questions[0]?.answers).toEqual([
+      { name: 'Ada', answer: 'B 4' },
+      { name: 'Grace', answer: 'A 3' },
     ]);
     expect(report.questions[1]).toMatchObject({
       graded: false,

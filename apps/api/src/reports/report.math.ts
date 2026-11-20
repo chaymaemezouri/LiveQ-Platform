@@ -14,8 +14,9 @@ export function percent(part: number, total: number): number {
 }
 
 export function buildReport(source: ReportSource): SessionReport {
+  const participants = source.participants ?? [];
   const questions = source.questions.map((question) =>
-    presentQuestion(question, source.participantCount),
+    presentQuestion(question, source.participantCount, participants),
   );
   const asked = source.questions.filter((question) => question.run);
   const voters = new Set<string>();
@@ -74,6 +75,7 @@ export function summarizeReport(report: SessionReport): ReportSummary {
 function presentQuestion(
   question: ReportSource['questions'][number],
   participantCount: number,
+  participants: { id: string; nickname: string | null }[],
 ): ReportQuestion {
   const votes = question.run?.votes ?? [];
   const published = question.run?.published ?? false;
@@ -105,6 +107,7 @@ function presentQuestion(
       correctOptionId: null,
       options: [],
       responses: [],
+      answers: [],
     };
   }
 
@@ -122,5 +125,39 @@ function presentQuestion(
     correctOptionId: graded ? question.correctOptionId : null,
     options: kind === 'TEXT' ? [] : resultBars(question.options, votes),
     responses,
+    answers: participantAnswers(question, participants, votes),
   };
+}
+
+function participantAnswers(
+  question: ReportSource['questions'][number],
+  participants: { id: string; nickname: string | null }[],
+  votes: { optionId: string | null; participantId: string; textResponse?: string | null }[],
+): { name: string; answer: string }[] {
+  const kind = question.kind ?? 'CHOICE';
+  return participants
+    .map((participant) => {
+      const vote = votes.find((item) => item.participantId === participant.id);
+      return {
+        name: participant.nickname?.trim() || 'Guest',
+        answer: vote ? answerText(question, kind, vote) : 'No answer',
+      };
+    })
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function answerText(
+  question: ReportSource['questions'][number],
+  kind: 'CHOICE' | 'TEXT',
+  vote: { optionId: string | null; textResponse?: string | null },
+): string {
+  if (kind === 'TEXT') {
+    return vote.textResponse?.trim() || 'No answer';
+  }
+  const index = question.options.findIndex((option) => option.id === vote.optionId);
+  const option = index >= 0 ? question.options[index] : undefined;
+  if (!option) {
+    return 'No answer';
+  }
+  return `${String.fromCharCode(65 + index)} ${option.label}`;
 }
